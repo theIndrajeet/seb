@@ -1,18 +1,4 @@
-# ===== Stage 1: 构建前端 =====
-FROM node:20-slim AS frontend-build
-
-WORKDIR /app/frontend
-
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-
-COPY frontend/ ./
-
-# 同源部署：前端由 Flask 托管，API 走相对路径
-ENV VITE_API_BASE_URL=/
-RUN npm run build
-
-# ===== Stage 2: 后端运行时 =====
+# 后端 API 镜像（前端独立托管，如 Lovable / 静态站点）
 FROM python:3.11
 
 # 从 uv 官方镜像复制 uv
@@ -27,9 +13,6 @@ RUN uv sync --frozen --no-dev
 # 复制后端源码、脚本、语言包
 COPY backend/ ./
 COPY locales/ /app/locales/
-
-# 前端构建产物（由 Flask 托管）
-COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 ENV FLASK_DEBUG=False \
     PYTHONUNBUFFERED=1 \
