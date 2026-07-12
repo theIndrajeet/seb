@@ -134,12 +134,43 @@ def generate_report():
                     progress=0,
                     message=t('api.initReportAgent')
                 )
-                
+
+                # 仲裁模式：先提取仲裁庭投票，将案件结构+裁决注入报告上下文
+                effective_requirement = simulation_requirement
+                if project.case_meta:
+                    import json as _json
+                    from ..services.verdict_extractor import VerdictExtractor, load_verdict
+                    from ..services.case_intake import format_case_context
+
+                    verdict = load_verdict(simulation_id)
+                    if verdict is None:
+                        try:
+                            task_manager.update_task(
+                                task_id, progress=2,
+                                message="Collecting tribunal ballots (verdict extraction)"
+                            )
+                            verdict = VerdictExtractor().extract(
+                                simulation_id=simulation_id,
+                                case_meta=project.case_meta
+                            )
+                        except Exception as verdict_err:
+                            logger.warning(f"裁决提取失败，报告将不含结构化投票: {verdict_err}")
+
+                    effective_requirement = (
+                        f"{simulation_requirement}\n\n{format_case_context(project.case_meta)}"
+                    )
+                    if verdict:
+                        slim = {k: verdict[k] for k in ("headline", "per_claim", "damages") if k in verdict}
+                        effective_requirement += (
+                            "\n\n## Tribunal vote (structured verdict, cite this in the report)\n"
+                            + _json.dumps(slim, ensure_ascii=False, indent=1)
+                        )
+
                 # 创建Report Agent
                 agent = ReportAgent(
                     graph_id=graph_id,
                     simulation_id=simulation_id,
-                    simulation_requirement=simulation_requirement
+                    simulation_requirement=effective_requirement
                 )
                 
                 # 进度回调

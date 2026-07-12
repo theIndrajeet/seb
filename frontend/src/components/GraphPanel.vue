@@ -13,12 +13,12 @@
         </button>
       </div>
     </div>
-    
+
     <div class="graph-container" ref="graphContainer">
       <!-- 图谱可视化 -->
       <div v-if="graphData" class="graph-view">
         <svg ref="graphSvg" class="graph-svg"></svg>
-        
+
         <!-- 构建中/模拟中提示 -->
         <div v-if="currentPhase === 1 || isSimulating" class="graph-building-hint">
           <div class="memory-icon-wrapper">
@@ -29,7 +29,7 @@
           </div>
           {{ isSimulating ? $t('graph.graphMemoryRealtime') : $t('graph.realtimeUpdating') }}
         </div>
-        
+
         <!-- 模拟结束后的提示 -->
         <div v-if="showSimulationFinishedHint" class="graph-building-hint finished-hint">
           <div class="hint-icon-wrapper">
@@ -47,17 +47,17 @@
             </svg>
           </button>
         </div>
-        
+
         <!-- 节点/边详情面板 -->
         <div v-if="selectedItem" class="detail-panel">
           <div class="detail-panel-header">
             <span class="detail-title">{{ selectedItem.type === 'node' ? $t('graph.nodeDetails') : $t('graph.relationship') }}</span>
-            <span v-if="selectedItem.type === 'node'" class="detail-type-badge" :style="{ background: selectedItem.color, color: '#fff' }">
+            <span v-if="selectedItem.type === 'node'" class="detail-type-badge" :style="{ background: selectedItem.color, color: '#0b0b17' }">
               {{ selectedItem.entityType }}
             </span>
             <button class="detail-close" @click="closeDetailPanel">×</button>
           </div>
-          
+
           <!-- 节点详情 -->
           <div v-if="selectedItem.type === 'node'" class="detail-content">
             <div class="detail-row">
@@ -72,7 +72,7 @@
               <span class="detail-label">Created:</span>
               <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
             </div>
-            
+
             <!-- Properties -->
             <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
               <div class="section-title">Properties:</div>
@@ -83,13 +83,13 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- Summary -->
             <div class="detail-section" v-if="selectedItem.data.summary">
               <div class="section-title">Summary:</div>
               <div class="summary-text">{{ selectedItem.data.summary }}</div>
             </div>
-            
+
             <!-- Labels -->
             <div class="detail-section" v-if="selectedItem.data.labels && selectedItem.data.labels.length > 0">
               <div class="section-title">Labels:</div>
@@ -100,7 +100,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 边详情 -->
           <div v-else class="detail-content">
             <!-- 自环组详情 -->
@@ -109,15 +109,15 @@
                 {{ selectedItem.data.source_name }} - Self Relations
                 <span class="self-loop-count">{{ selectedItem.data.selfLoopCount }} items</span>
               </div>
-              
+
               <div class="self-loop-list">
-                <div 
-                  v-for="(loop, idx) in selectedItem.data.selfLoopEdges" 
-                  :key="loop.uuid || idx" 
+                <div
+                  v-for="(loop, idx) in selectedItem.data.selfLoopEdges"
+                  :key="loop.uuid || idx"
                   class="self-loop-item"
                   :class="{ expanded: expandedSelfLoops.has(loop.uuid || idx) }"
                 >
-                  <div 
+                  <div
                     class="self-loop-item-header"
                     @click="toggleSelfLoop(loop.uuid || idx)"
                   >
@@ -125,7 +125,7 @@
                     <span class="self-loop-name">{{ loop.name || loop.fact_type || 'RELATED' }}</span>
                     <span class="self-loop-toggle">{{ expandedSelfLoops.has(loop.uuid || idx) ? '−' : '+' }}</span>
                   </div>
-                  
+
                   <div class="self-loop-item-content" v-show="expandedSelfLoops.has(loop.uuid || idx)">
                     <div class="detail-row" v-if="loop.uuid">
                       <span class="detail-label">UUID:</span>
@@ -153,13 +153,13 @@
                 </div>
               </div>
             </template>
-            
+
             <!-- 普通边详情 -->
             <template v-else>
               <div class="edge-relation-header">
                 {{ selectedItem.data.source_name }} → {{ selectedItem.data.name || 'RELATED_TO' }} → {{ selectedItem.data.target_name }}
               </div>
-              
+
               <div class="detail-row">
                 <span class="detail-label">UUID:</span>
                 <span class="detail-value uuid-text">{{ selectedItem.data.uuid }}</span>
@@ -176,7 +176,7 @@
                 <span class="detail-label">Fact:</span>
                 <span class="detail-value fact-text">{{ selectedItem.data.fact }}</span>
               </div>
-              
+
               <!-- Episodes -->
               <div class="detail-section" v-if="selectedItem.data.episodes && selectedItem.data.episodes.length > 0">
                 <div class="section-title">Episodes:</div>
@@ -186,7 +186,7 @@
                   </span>
                 </div>
               </div>
-              
+
               <div class="detail-row" v-if="selectedItem.data.created_at">
                 <span class="detail-label">Created:</span>
                 <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
@@ -199,13 +199,13 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 加载状态 -->
       <div v-else-if="loading" class="graph-state">
         <div class="loading-spinner"></div>
         <p>{{ $t('graph.graphDataLoading') }}</p>
       </div>
-      
+
       <!-- 等待/空状态 -->
       <div v-else class="graph-state">
         <div class="empty-icon">❖</div>
@@ -223,7 +223,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 显示边标签开关 -->
     <div v-if="graphData" class="edge-labels-toggle">
       <label class="toggle-switch">
@@ -281,17 +281,58 @@ const toggleSelfLoop = (id) => {
   expandedSelfLoops.value = newSet
 }
 
-// 计算实体类型用于图例
+// ============ 案件图谱语义配置 (Case-map semantics) ============
+
+// 亮色系实体类型调色板（深色背景可读）
+const TYPE_COLORS = {
+  Party: '#a78bfa',
+  Counsel: '#c4b5fd',
+  Claim: '#f472b6',
+  Contract: '#fbbf24',
+  Evidence: '#34d399',
+  LegalAuthority: '#60a5fa',
+  Witness: '#22d3ee',
+  Expert: '#22d3ee',
+  Person: '#94a3b8',
+  Organization: '#fb923c'
+}
+const FALLBACK_COLOR = '#64748b'
+const getColor = (type) => TYPE_COLORS[type] || FALLBACK_COLOR
+
+// 类型语义分区：Claims 居中；Party/Counsel 靠左；Evidence/Witness 靠右；Contract/LegalAuthority 底部居中
+const TYPE_ZONES = {
+  Claim: { x: 0.50, y: 0.44 },
+  Party: { x: 0.16, y: 0.38 },
+  Counsel: { x: 0.14, y: 0.64 },
+  Person: { x: 0.28, y: 0.52 },
+  Organization: { x: 0.30, y: 0.26 },
+  Evidence: { x: 0.84, y: 0.38 },
+  Witness: { x: 0.86, y: 0.64 },
+  Expert: { x: 0.86, y: 0.64 },
+  Contract: { x: 0.42, y: 0.84 },
+  LegalAuthority: { x: 0.60, y: 0.84 }
+}
+const getZone = (type) => TYPE_ZONES[type] || { x: 0.5, y: 0.5 }
+
+// 基础样式常量
+const EDGE_STROKE = 'rgba(255, 255, 255, 0.18)'
+const EDGE_STROKE_HOVER = 'rgba(255, 255, 255, 0.55)'
+const EDGE_STROKE_SELECTED = '#818cf8'
+const EDGE_LABEL_FILL = '#9ca3af'
+const EDGE_LABEL_BG = 'rgba(10, 10, 25, 0.85)'
+const NODE_STROKE = 'rgba(255, 255, 255, 0.35)'
+const NODE_STROKE_SELECTED = '#22d3ee'
+const DIM_OPACITY = 0.15
+const LABEL_DENSITY_CAP = 150 // 节点数超过此值时按度数筛选标签
+
+// 计算实体类型用于图例（固定语义调色板）
 const entityTypes = computed(() => {
   if (!props.graphData?.nodes) return []
   const typeMap = {}
-  // 美观的颜色调色板
-  const colors = ['#FF6B35', '#004E89', '#7B2D8E', '#1A936F', '#C5283D', '#E9724C', '#3498db', '#9b59b6', '#27ae60', '#f39c12']
-  
   props.graphData.nodes.forEach(node => {
     const type = node.labels?.find(l => l !== 'Entity') || 'Entity'
     if (!typeMap[type]) {
-      typeMap[type] = { name: type, count: 0, color: colors[Object.keys(typeMap).length % colors.length] }
+      typeMap[type] = { name: type, count: 0, color: getColor(type) }
     }
     typeMap[type].count++
   })
@@ -303,13 +344,13 @@ const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
   try {
     const date = new Date(dateStr)
-    return date.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     })
   } catch {
     return dateStr
@@ -324,50 +365,71 @@ const closeDetailPanel = () => {
 let currentSimulation = null
 let linkLabelsRef = null
 let linkLabelBgRef = null
+let positionEdgeLabelsRef = null
+
+// 结构签名缓存：轮询数据未变化时不重跑布局
+let lastGraphSignature = ''
+const lastPositions = new Map()
+
+const computeGraphSignature = (data) => {
+  const n = (data?.nodes || []).map(x => x.uuid).sort().join(',')
+  const e = (data?.edges || [])
+    .map(x => x.uuid || `${x.source_node_uuid}>${x.target_node_uuid}:${x.name || x.fact_type || ''}`)
+    .sort().join(',')
+  return `${n}#${e}`
+}
 
 const renderGraph = () => {
   if (!graphSvg.value || !props.graphData) return
-  
-  // 停止之前的仿真
+
+  // 保存旧位置，供增量更新时复用（避免整图重排跳动）
   if (currentSimulation) {
+    currentSimulation.nodes().forEach(n => lastPositions.set(n.id, { x: n.x, y: n.y }))
     currentSimulation.stop()
   }
-  
+
   const container = graphContainer.value
   const width = container.clientWidth
   const height = container.clientHeight
-  
+  if (!width || !height) return
+
   const svg = d3.select(graphSvg.value)
     .attr('width', width)
     .attr('height', height)
     .attr('viewBox', `0 0 ${width} ${height}`)
-    
+
   svg.selectAll('*').remove()
-  
+
   const nodesData = props.graphData.nodes || []
   const edgesData = props.graphData.edges || []
-  
+
   if (nodesData.length === 0) return
 
   // Prep data
   const nodeMap = {}
   nodesData.forEach(n => nodeMap[n.uuid] = n)
-  
-  const nodes = nodesData.map(n => ({
-    id: n.uuid,
-    name: n.name || 'Unnamed',
-    type: n.labels?.find(l => l !== 'Entity') || 'Entity',
-    rawData: n
-  }))
-  
+
+  const seededCount = { value: 0 }
+  const nodes = nodesData.map(n => {
+    const prev = lastPositions.get(n.uuid)
+    if (prev) seededCount.value++
+    return {
+      id: n.uuid,
+      name: n.name || 'Unnamed',
+      type: n.labels?.find(l => l !== 'Entity') || 'Entity',
+      rawData: n,
+      ...(prev ? { x: prev.x, y: prev.y } : {})
+    }
+  })
+
   const nodeIds = new Set(nodes.map(n => n.id))
-  
+
   // 处理边数据，计算同一对节点间的边数量和索引
   const edgePairCount = {}
   const selfLoopEdges = {} // 按节点分组的自环边
   const tempEdges = edgesData
     .filter(e => nodeIds.has(e.source_node_uuid) && nodeIds.has(e.target_node_uuid))
-  
+
   // 统计每对节点之间的边数量，收集自环边
   tempEdges.forEach(e => {
     if (e.source_node_uuid === e.target_node_uuid) {
@@ -385,26 +447,26 @@ const renderGraph = () => {
       edgePairCount[pairKey] = (edgePairCount[pairKey] || 0) + 1
     }
   })
-  
+
   // 记录当前处理到每对节点的第几条边
   const edgePairIndex = {}
   const processedSelfLoopNodes = new Set() // 已处理的自环节点
-  
+
   const edges = []
-  
+
   tempEdges.forEach(e => {
     const isSelfLoop = e.source_node_uuid === e.target_node_uuid
-    
+
     if (isSelfLoop) {
       // 自环边 - 每个节点只添加一条合并的自环
       if (processedSelfLoopNodes.has(e.source_node_uuid)) {
         return // 已处理过，跳过
       }
       processedSelfLoopNodes.add(e.source_node_uuid)
-      
+
       const allSelfLoops = selfLoopEdges[e.source_node_uuid]
       const nodeName = nodeMap[e.source_node_uuid]?.name || 'Unknown'
-      
+
       edges.push({
         source: e.source_node_uuid,
         target: e.target_node_uuid,
@@ -422,30 +484,28 @@ const renderGraph = () => {
       })
       return
     }
-    
+
     const pairKey = [e.source_node_uuid, e.target_node_uuid].sort().join('_')
     const totalCount = edgePairCount[pairKey]
     const currentIndex = edgePairIndex[pairKey] || 0
     edgePairIndex[pairKey] = currentIndex + 1
-    
+
     // 判断边的方向是否与标准化方向一致（源UUID < 目标UUID）
     const isReversed = e.source_node_uuid > e.target_node_uuid
-    
+
     // 计算曲率：多条边时分散开，单条边为直线
     let curvature = 0
     if (totalCount > 1) {
       // 均匀分布曲率，确保明显区分
-      // 曲率范围根据边数量增加，边越多曲率范围越大
       const curvatureRange = Math.min(1.2, 0.6 + totalCount * 0.15)
       curvature = ((currentIndex / (totalCount - 1)) - 0.5) * curvatureRange * 2
-      
+
       // 如果边的方向与标准化方向相反，翻转曲率
-      // 这样确保所有边在同一参考系下分布，不会因方向不同而重叠
       if (isReversed) {
         curvature = -curvature
       }
     }
-    
+
     edges.push({
       source: e.source_node_uuid,
       target: e.target_node_uuid,
@@ -462,32 +522,83 @@ const renderGraph = () => {
       }
     })
   })
-    
-  // Color scale
-  const colorMap = {}
-  entityTypes.value.forEach(t => colorMap[t.name] = t.color)
-  const getColor = (type) => colorMap[type] || '#999'
 
-  // Simulation - 根据边数量动态调整节点间距
+  // ===== 度数 → 半径（sqrt 比例尺，6-22px） + 邻接表 =====
+  const degreeMap = {}
+  const adjacency = new Map()
+  nodes.forEach(n => adjacency.set(n.id, new Set()))
+  edges.forEach(e => {
+    if (e.isSelfLoop) return
+    degreeMap[e.source] = (degreeMap[e.source] || 0) + 1
+    degreeMap[e.target] = (degreeMap[e.target] || 0) + 1
+    adjacency.get(e.source)?.add(e.target)
+    adjacency.get(e.target)?.add(e.source)
+  })
+  const maxDegree = Math.max(1, ...nodes.map(n => degreeMap[n.id] || 0))
+  const radiusScale = d3.scaleSqrt().domain([0, maxDegree]).range([6, 22])
+  nodes.forEach(n => {
+    n.degree = degreeMap[n.id] || 0
+    n.radius = radiusScale(n.degree)
+  })
+
+  // 大图时的标签密度控制：只显示度数较高的节点标签，其余悬停显示
+  const denseGraph = nodes.length > LABEL_DENSITY_CAP
+  let labelDegreeThreshold = 0
+  if (denseGraph) {
+    const sortedDegrees = nodes.map(n => n.degree).sort((a, b) => b - a)
+    labelDegreeThreshold = Math.max(1, sortedDegrees[Math.min(LABEL_DENSITY_CAP - 1, sortedDegrees.length - 1)])
+  }
+  const isLabelVisible = (d) => !denseGraph || d.degree >= labelDegreeThreshold
+
+  // ===== 类型感知力导向布局（语义分区） =====
   const simulation = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(edges).id(d => d.id).distance(d => {
-      // 根据这对节点之间的边数量动态调整距离
-      // 基础距离 150，每多一条边增加 40
-      const baseDistance = 150
+      const baseDistance = 130
       const edgeCount = d.pairTotal || 1
       return baseDistance + (edgeCount - 1) * 50
     }))
-    .force('charge', d3.forceManyBody().strength(-400))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collide', d3.forceCollide(50))
-    // 添加向中心的引力，让独立的节点群聚集到中心区域
-    .force('x', d3.forceX(width / 2).strength(0.04))
-    .force('y', d3.forceY(height / 2).strength(0.04))
-  
+    .force('charge', d3.forceManyBody().strength(-350))
+    .force('collide', d3.forceCollide().radius(d => d.radius + 16))
+    // 按实体类型的语义位置聚拢：形成 Claims 中心 / 当事人左侧 / 证据右侧 / 合同与法律依据底部 的可读结构
+    .force('x', d3.forceX(d => getZone(d.type).x * width).strength(d => TYPE_ZONES[d.type] ? 0.2 : 0.06))
+    .force('y', d3.forceY(d => getZone(d.type).y * height).strength(d => TYPE_ZONES[d.type] ? 0.2 : 0.06))
+    .alphaDecay(0.05)
+
+  // 增量更新（大部分节点已有位置）时用低 alpha 微调，避免整图跳动
+  if (seededCount.value > 0 && seededCount.value >= nodes.length * 0.8) {
+    simulation.alpha(0.3)
+  }
+
   currentSimulation = simulation
 
+  // ===== SVG defs：箭头 marker + Claim 光晕 filter =====
+  const defs = svg.append('defs')
+  defs.append('marker')
+    .attr('id', 'sb-graph-arrow')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 9)
+    .attr('refY', 0)
+    .attr('markerWidth', 6.5)
+    .attr('markerHeight', 6.5)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', 'rgba(255, 255, 255, 0.3)')
+
+  const glowFilter = defs.append('filter')
+    .attr('id', 'sb-claim-glow')
+    .attr('x', '-60%').attr('y', '-60%')
+    .attr('width', '220%').attr('height', '220%')
+  glowFilter.append('feGaussianBlur')
+    .attr('in', 'SourceGraphic')
+    .attr('stdDeviation', 3.5)
+    .attr('result', 'blur')
+  const glowMerge = glowFilter.append('feMerge')
+  glowMerge.append('feMergeNode').attr('in', 'blur')
+  glowMerge.append('feMergeNode').attr('in', 'SourceGraphic')
+
   const g = svg.append('g')
-  
+
   // Zoom
   svg.call(d3.zoom().extent([[0, 0], [width, height]]).scaleExtent([0.1, 4]).on('zoom', (event) => {
     g.attr('transform', event.transform)
@@ -495,35 +606,38 @@ const renderGraph = () => {
 
   // Links - 使用 path 支持曲线
   const linkGroup = g.append('g').attr('class', 'links')
-  
-  // 计算曲线路径
+
+  // 计算曲线路径（终点回缩到目标节点半径外，让箭头可见）
   const getLinkPath = (d) => {
     const sx = d.source.x, sy = d.source.y
-    const tx = d.target.x, ty = d.target.y
-    
+    let tx = d.target.x, ty = d.target.y
+
     // 检测自环
     if (d.isSelfLoop) {
       // 自环：绘制一个圆弧从节点出发再返回
-      const loopRadius = 30
-      // 从节点右侧出发，绕一圈回来
-      const x1 = sx + 8  // 起点偏移
-      const y1 = sy - 4
-      const x2 = sx + 8  // 终点偏移
-      const y2 = sy + 4
-      // 使用圆弧绘制自环（sweep-flag=1 顺时针）
+      const loopRadius = 26 + (d.source.radius || 8)
+      const r = (d.source.radius || 8)
+      const x1 = sx + r * 0.9
+      const y1 = sy - r * 0.45
+      const x2 = sx + r * 0.9
+      const y2 = sy + r * 0.45
       return `M${x1},${y1} A${loopRadius},${loopRadius} 0 1,1 ${x2},${y2}`
     }
-    
+
+    const targetPad = (d.target.radius || 8) + 4
+
     if (d.curvature === 0) {
-      // 直线
+      // 直线：终点回缩
+      const dx = tx - sx, dy = ty - sy
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1
+      tx = tx - (dx / dist) * targetPad
+      ty = ty - (dy / dist) * targetPad
       return `M${sx},${sy} L${tx},${ty}`
     }
-    
+
     // 计算曲线控制点 - 根据边数量和距离动态调整
     const dx = tx - sx, dy = ty - sy
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    // 垂直于连线方向的偏移，根据距离比例计算，保证曲线明显可见
-    // 边越多，偏移量占距离的比例越大
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1
     const pairTotal = d.pairTotal || 1
     const offsetRatio = 0.25 + pairTotal * 0.05 // 基础25%，每多一条边增加5%
     const baseOffset = Math.max(35, dist * offsetRatio)
@@ -531,28 +645,34 @@ const renderGraph = () => {
     const offsetY = dx / dist * d.curvature * baseOffset
     const cx = (sx + tx) / 2 + offsetX
     const cy = (sy + ty) / 2 + offsetY
-    
+
+    // 沿曲线末端切线方向（控制点 → 终点）回缩终点
+    const edx = tx - cx, edy = ty - cy
+    const edist = Math.sqrt(edx * edx + edy * edy) || 1
+    tx = tx - (edx / edist) * targetPad
+    ty = ty - (edy / edist) * targetPad
+
     return `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`
   }
-  
+
   // 计算曲线中点（用于标签定位）
   const getLinkMidpoint = (d) => {
     const sx = d.source.x, sy = d.source.y
     const tx = d.target.x, ty = d.target.y
-    
+
     // 检测自环
     if (d.isSelfLoop) {
       // 自环标签位置：节点右侧
-      return { x: sx + 70, y: sy }
+      return { x: sx + 66 + (d.source.radius || 8), y: sy }
     }
-    
+
     if (d.curvature === 0) {
       return { x: (sx + tx) / 2, y: (sy + ty) / 2 }
     }
-    
+
     // 二次贝塞尔曲线的中点 t=0.5
     const dx = tx - sx, dy = ty - sy
-    const dist = Math.sqrt(dx * dx + dy * dy)
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1
     const pairTotal = d.pairTotal || 1
     const offsetRatio = 0.25 + pairTotal * 0.05
     const baseOffset = Math.max(35, dist * offsetRatio)
@@ -560,60 +680,33 @@ const renderGraph = () => {
     const offsetY = dx / dist * d.curvature * baseOffset
     const cx = (sx + tx) / 2 + offsetX
     const cy = (sy + ty) / 2 + offsetY
-    
+
     // 二次贝塞尔曲线公式 B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2, t=0.5
     const midX = 0.25 * sx + 0.5 * cx + 0.25 * tx
     const midY = 0.25 * sy + 0.5 * cy + 0.25 * ty
-    
+
     return { x: midX, y: midY }
   }
-  
+
   const link = linkGroup.selectAll('path')
     .data(edges)
     .enter().append('path')
-    .attr('stroke', '#C0C0C0')
-    .attr('stroke-width', 1.5)
+    .attr('stroke', EDGE_STROKE)
+    .attr('stroke-width', 1.4)
     .attr('fill', 'none')
+    .attr('marker-end', d => d.isSelfLoop ? null : 'url(#sb-graph-arrow)')
     .style('cursor', 'pointer')
-    .on('click', (event, d) => {
-      event.stopPropagation()
-      // 重置之前选中边的样式
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
-      // 高亮当前选中的边
-      d3.select(event.target).attr('stroke', '#3498db').attr('stroke-width', 3)
-      
-      selectedItem.value = {
-        type: 'edge',
-        data: d.rawData
-      }
-    })
 
-  // Link labels background (白色背景使文字更清晰)
+  // Link labels background（深色底使文字在暗色画布上清晰）
   const linkLabelBg = linkGroup.selectAll('rect')
     .data(edges)
     .enter().append('rect')
-    .attr('fill', 'rgba(255,255,255,0.95)')
+    .attr('fill', EDGE_LABEL_BG)
     .attr('rx', 3)
     .attr('ry', 3)
     .style('cursor', 'pointer')
     .style('pointer-events', 'all')
     .style('display', showEdgeLabels.value ? 'block' : 'none')
-    .on('click', (event, d) => {
-      event.stopPropagation()
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
-      // 高亮对应的边
-      link.filter(l => l === d).attr('stroke', '#3498db').attr('stroke-width', 3)
-      d3.select(event.target).attr('fill', 'rgba(52, 152, 219, 0.1)')
-      
-      selectedItem.value = {
-        type: 'edge',
-        data: d.rawData
-      }
-    })
 
   // Link labels
   const linkLabels = linkGroup.selectAll('text')
@@ -621,44 +714,157 @@ const renderGraph = () => {
     .enter().append('text')
     .text(d => d.name)
     .attr('font-size', '9px')
-    .attr('fill', '#666')
+    .attr('fill', EDGE_LABEL_FILL)
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'middle')
     .style('cursor', 'pointer')
     .style('pointer-events', 'all')
     .style('font-family', 'system-ui, sans-serif')
     .style('display', showEdgeLabels.value ? 'block' : 'none')
-    .on('click', (event, d) => {
-      event.stopPropagation()
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
-      // 高亮对应的边
-      link.filter(l => l === d).attr('stroke', '#3498db').attr('stroke-width', 3)
-      d3.select(event.target).attr('fill', '#3498db')
-      
-      selectedItem.value = {
-        type: 'edge',
-        data: d.rawData
-      }
-    })
-  
+
   // 保存引用供外部控制显隐
   linkLabelsRef = linkLabels
   linkLabelBgRef = linkLabelBg
 
   // Nodes group
   const nodeGroup = g.append('g').attr('class', 'nodes')
-  
-  // Node circles
+
+  // Node circles（半径按度数缩放；Claim 节点附加光晕）
   const node = nodeGroup.selectAll('circle')
     .data(nodes)
     .enter().append('circle')
-    .attr('r', 10)
+    .attr('r', d => d.radius)
     .attr('fill', d => getColor(d.type))
-    .attr('stroke', '#fff')
-    .attr('stroke-width', 2.5)
+    .attr('stroke', NODE_STROKE)
+    .attr('stroke-width', 1.5)
+    .attr('filter', d => d.type === 'Claim' ? 'url(#sb-claim-glow)' : null)
     .style('cursor', 'pointer')
+
+  // Node Labels（始终可见；大图时按度数抽稀，悬停补显）
+  const nodeLabels = nodeGroup.selectAll('text')
+    .data(nodes)
+    .enter().append('text')
+    .text(d => d.name.length > 18 ? d.name.substring(0, 18) + '…' : d.name)
+    .attr('font-size', '10.5px')
+    .attr('fill', '#e8e8f5')
+    .attr('font-weight', '500')
+    .attr('dx', d => d.radius + 5)
+    .attr('dy', 3.5)
+    .attr('stroke', 'rgba(10, 10, 25, 0.85)')
+    .attr('stroke-width', 3)
+    .attr('stroke-linejoin', 'round')
+    .style('paint-order', 'stroke')
+    .style('pointer-events', 'none')
+    .style('font-family', 'system-ui, sans-serif')
+    .style('display', d => isLabelVisible(d) ? 'block' : 'none')
+
+  // ===== 边标签位置更新（tick 内 + 显隐切换后调用） =====
+  const positionEdgeLabels = () => {
+    linkLabels.each(function(d) {
+      if (this.style.display === 'none') return
+      const mid = getLinkMidpoint(d)
+      d3.select(this)
+        .attr('x', mid.x)
+        .attr('y', mid.y)
+        .attr('transform', '')
+    })
+    linkLabelBg.each(function(d, i) {
+      if (this.style.display === 'none') return
+      const textEl = linkLabels.nodes()[i]
+      if (!textEl || textEl.style.display === 'none') return
+      const mid = getLinkMidpoint(d)
+      const bbox = textEl.getBBox()
+      d3.select(this)
+        .attr('x', mid.x - bbox.width / 2 - 4)
+        .attr('y', mid.y - bbox.height / 2 - 2)
+        .attr('width', bbox.width + 8)
+        .attr('height', bbox.height + 4)
+        .attr('transform', '')
+    })
+  }
+  positionEdgeLabelsRef = positionEdgeLabels
+
+  // ===== 基础样式重置 + 选中态重放 =====
+  let selectedDatum = null // { kind: 'node' | 'edge', d }
+
+  const applyBaseStyles = () => {
+    node.attr('stroke', NODE_STROKE).attr('stroke-width', 1.5).attr('opacity', 1)
+    nodeLabels.attr('opacity', 1).style('display', d => isLabelVisible(d) ? 'block' : 'none')
+    link.attr('stroke', EDGE_STROKE).attr('stroke-width', 1.4).attr('opacity', 1)
+    linkLabels.attr('fill', EDGE_LABEL_FILL).attr('opacity', 1)
+    linkLabelBg.attr('fill', EDGE_LABEL_BG).attr('opacity', 1)
+    applyEdgeLabelVisibility()
+  }
+
+  const applySelectionStyles = () => {
+    if (!selectedDatum) return
+    if (selectedDatum.kind === 'node') {
+      const id = selectedDatum.d.id
+      node.filter(n => n.id === id)
+        .attr('stroke', NODE_STROKE_SELECTED)
+        .attr('stroke-width', 3)
+      link.filter(l => l.source.id === id || l.target.id === id)
+        .attr('stroke', NODE_STROKE_SELECTED)
+        .attr('stroke-width', 2.2)
+    } else {
+      link.filter(l => l === selectedDatum.d)
+        .attr('stroke', EDGE_STROKE_SELECTED)
+        .attr('stroke-width', 2.6)
+      linkLabels.filter(l => l === selectedDatum.d).attr('fill', EDGE_STROKE_SELECTED)
+      linkLabelBg.filter(l => l === selectedDatum.d).attr('fill', 'rgba(129, 140, 248, 0.25)')
+    }
+  }
+
+  function applyEdgeLabelVisibility() {
+    const disp = showEdgeLabels.value ? 'block' : 'none'
+    linkLabels.style('display', disp)
+    linkLabelBg.style('display', disp)
+    if (showEdgeLabels.value) positionEdgeLabels()
+  }
+
+  const resetStyles = () => {
+    applyBaseStyles()
+    applySelectionStyles()
+  }
+
+  // ===== 边交互：点击选中 + 悬停高亮/临时显示标签 =====
+  const selectEdge = (event, d) => {
+    event.stopPropagation()
+    selectedDatum = { kind: 'edge', d }
+    resetStyles()
+    selectedItem.value = { type: 'edge', data: d.rawData }
+  }
+
+  const edgeHoverIn = (event, d) => {
+    link.filter(l => l === d)
+      .attr('stroke', EDGE_STROKE_HOVER)
+      .attr('stroke-width', 2)
+      .attr('opacity', 1)
+    // 悬停边时始终显示该边标签（即使全局标签关闭）
+    linkLabels.filter(l => l === d).style('display', 'block').attr('fill', '#e8e8f5')
+    linkLabelBg.filter(l => l === d).style('display', 'block')
+    positionEdgeLabels()
+  }
+
+  const edgeHoverOut = () => {
+    resetStyles()
+  }
+
+  link
+    .on('click', selectEdge)
+    .on('mouseenter', edgeHoverIn)
+    .on('mouseleave', edgeHoverOut)
+  linkLabelBg
+    .on('click', selectEdge)
+    .on('mouseenter', edgeHoverIn)
+    .on('mouseleave', edgeHoverOut)
+  linkLabels
+    .on('click', selectEdge)
+    .on('mouseenter', edgeHoverIn)
+    .on('mouseleave', edgeHoverOut)
+
+  // ===== 节点交互：拖拽 / 点击 / 悬停高亮邻居 =====
+  node
     .call(d3.drag()
       .on('start', (event, d) => {
         // 只记录位置，不重启仿真（区分点击和拖拽）
@@ -673,13 +879,14 @@ const renderGraph = () => {
         const dx = event.x - d._dragStartX
         const dy = event.y - d._dragStartY
         const distance = Math.sqrt(dx * dx + dy * dy)
-        
+
         if (!d._isDragging && distance > 3) {
-          // 首次检测到真正拖拽，才重启仿真
+          // 首次检测到真正拖拽，才重启仿真（并重置 tick 上限）
           d._isDragging = true
+          tickCount = 0
           simulation.alphaTarget(0.3).restart()
         }
-        
+
         if (d._isDragging) {
           d.fx = event.x
           d.fy = event.y
@@ -697,16 +904,8 @@ const renderGraph = () => {
     )
     .on('click', (event, d) => {
       event.stopPropagation()
-      // 重置所有节点样式
-      node.attr('stroke', '#fff').attr('stroke-width', 2.5)
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      // 高亮选中节点
-      d3.select(event.target).attr('stroke', '#E91E63').attr('stroke-width', 4)
-      // 高亮与此节点相连的边
-      link.filter(l => l.source.id === d.id || l.target.id === d.id)
-        .attr('stroke', '#E91E63')
-        .attr('stroke-width', 2.5)
-      
+      selectedDatum = { kind: 'node', d }
+      resetStyles()
       selectedItem.value = {
         type: 'node',
         data: d.rawData,
@@ -715,54 +914,40 @@ const renderGraph = () => {
       }
     })
     .on('mouseenter', (event, d) => {
-      if (!selectedItem.value || selectedItem.value.data?.uuid !== d.rawData.uuid) {
-        d3.select(event.target).attr('stroke', '#333').attr('stroke-width', 3)
-      }
+      const neighbors = adjacency.get(d.id) || new Set()
+      const isRelatedNode = (n) => n.id === d.id || neighbors.has(n.id)
+      const isRelatedLink = (l) => l.source.id === d.id || l.target.id === d.id
+
+      // 高亮邻居，弱化其余
+      node.attr('opacity', n => isRelatedNode(n) ? 1 : DIM_OPACITY)
+      node.filter(n => n.id === d.id).attr('stroke', '#ffffff').attr('stroke-width', 2.5)
+      nodeLabels
+        .attr('opacity', n => isRelatedNode(n) ? 1 : DIM_OPACITY)
+        .style('display', n => (isRelatedNode(n) || isLabelVisible(n)) ? 'block' : 'none')
+      link
+        .attr('opacity', l => isRelatedLink(l) ? 1 : DIM_OPACITY)
+        .attr('stroke', l => isRelatedLink(l) ? EDGE_STROKE_HOVER : EDGE_STROKE)
+      linkLabels.attr('opacity', l => isRelatedLink(l) ? 1 : DIM_OPACITY)
+      linkLabelBg.attr('opacity', l => isRelatedLink(l) ? 1 : DIM_OPACITY)
     })
-    .on('mouseleave', (event, d) => {
-      if (!selectedItem.value || selectedItem.value.data?.uuid !== d.rawData.uuid) {
-        d3.select(event.target).attr('stroke', '#fff').attr('stroke-width', 2.5)
-      }
+    .on('mouseleave', () => {
+      resetStyles()
     })
 
-  // Node Labels
-  const nodeLabels = nodeGroup.selectAll('text')
-    .data(nodes)
-    .enter().append('text')
-    .text(d => d.name.length > 8 ? d.name.substring(0, 8) + '…' : d.name)
-    .attr('font-size', '11px')
-    .attr('fill', '#333')
-    .attr('font-weight', '500')
-    .attr('dx', 14)
-    .attr('dy', 4)
-    .style('pointer-events', 'none')
-    .style('font-family', 'system-ui, sans-serif')
-
+  // ===== tick：位置更新 + 稳定后停止 =====
+  let tickCount = 0
   simulation.on('tick', () => {
+    tickCount++
+    if (tickCount > 300) {
+      simulation.stop()
+      return
+    }
+
     // 更新曲线路径
     link.attr('d', d => getLinkPath(d))
-    
+
     // 更新边标签位置（无旋转，水平显示更清晰）
-    linkLabels.each(function(d) {
-      const mid = getLinkMidpoint(d)
-      d3.select(this)
-        .attr('x', mid.x)
-        .attr('y', mid.y)
-        .attr('transform', '') // 移除旋转，保持水平
-    })
-    
-    // 更新边标签背景
-    linkLabelBg.each(function(d, i) {
-      const mid = getLinkMidpoint(d)
-      const textEl = linkLabels.nodes()[i]
-      const bbox = textEl.getBBox()
-      d3.select(this)
-        .attr('x', mid.x - bbox.width / 2 - 4)
-        .attr('y', mid.y - bbox.height / 2 - 2)
-        .attr('width', bbox.width + 8)
-        .attr('height', bbox.height + 4)
-        .attr('transform', '') // 移除旋转
-    })
+    positionEdgeLabels()
 
     node
       .attr('cx', d => d.x)
@@ -772,18 +957,25 @@ const renderGraph = () => {
       .attr('x', d => d.x)
       .attr('y', d => d.y)
   })
-  
+
+  simulation.on('end', () => {
+    nodes.forEach(n => lastPositions.set(n.id, { x: n.x, y: n.y }))
+  })
+
   // 点击空白处关闭详情面板
   svg.on('click', () => {
     selectedItem.value = null
-    node.attr('stroke', '#fff').attr('stroke-width', 2.5)
-    linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-    linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-    linkLabels.attr('fill', '#666')
+    selectedDatum = null
+    resetStyles()
   })
 }
 
 watch(() => props.graphData, () => {
+  if (!props.graphData) return
+  // 数据轮询去抖：节点/边集合未变时跳过重新布局
+  const signature = computeGraphSignature(props.graphData)
+  if (signature === lastGraphSignature && currentSimulation) return
+  lastGraphSignature = signature
   nextTick(renderGraph)
 }, { deep: true })
 
@@ -795,6 +987,10 @@ watch(showEdgeLabels, (newVal) => {
   if (linkLabelBgRef) {
     linkLabelBgRef.style('display', newVal ? 'block' : 'none')
   }
+  // 仿真可能已停止，切换后需手动刷新标签位置
+  if (newVal && positionEdgeLabelsRef) {
+    positionEdgeLabelsRef()
+  }
 })
 
 const handleResize = () => {
@@ -803,6 +999,10 @@ const handleResize = () => {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+  if (props.graphData) {
+    lastGraphSignature = computeGraphSignature(props.graphData)
+    nextTick(renderGraph)
+  }
 })
 
 onUnmounted(() => {
@@ -818,9 +1018,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: #FAFAFA;
-  background-image: radial-gradient(#D0D0D0 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
+  background: rgba(10, 10, 25, 0.5);
   overflow: hidden;
 }
 
@@ -834,14 +1032,15 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0));
+  background: linear-gradient(to bottom, rgba(11, 11, 23, 0.85), rgba(11, 11, 23, 0));
   pointer-events: none;
 }
 
 .panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  font-family: var(--sb-font-display);
+  color: var(--sb-text);
   pointer-events: auto;
 }
 
@@ -855,24 +1054,31 @@ onUnmounted(() => {
 .tool-btn {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #E0E0E0;
-  background: #FFF;
-  border-radius: 6px;
+  border: 1px solid var(--sb-glass-border);
+  background: var(--sb-glass);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  border-radius: var(--sb-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  color: #666;
+  color: var(--sb-text-secondary);
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: var(--sb-shadow);
   font-size: 13px;
 }
 
 .tool-btn:hover {
-  background: #F5F5F5;
-  color: #000;
-  border-color: #CCC;
+  background: var(--sb-glass-strong);
+  color: var(--sb-text);
+  border-color: var(--sb-glass-border-strong);
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tool-btn .btn-text {
@@ -896,19 +1102,24 @@ onUnmounted(() => {
   display: block;
 }
 
+.graph-svg {
+  background: transparent;
+}
+
 .graph-state {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 .empty-icon {
   font-size: 48px;
   margin-bottom: 16px;
-  opacity: 0.2;
+  opacity: 0.3;
+  color: var(--sb-text-secondary);
 }
 
 /* Entity Types Legend - Bottom Left */
@@ -916,11 +1127,13 @@ onUnmounted(() => {
   position: absolute;
   bottom: 24px;
   left: 24px;
-  background: rgba(255,255,255,0.95);
+  background: rgba(18, 18, 34, 0.75);
   padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid #EAEAEA;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border-radius: var(--sb-radius-sm);
+  border: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   z-index: 10;
 }
 
@@ -928,7 +1141,7 @@ onUnmounted(() => {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: #E91E63;
+  color: #a78bfa;
   margin-bottom: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -946,7 +1159,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #555;
+  color: var(--sb-text-secondary);
 }
 
 .legend-dot {
@@ -954,6 +1167,7 @@ onUnmounted(() => {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
 }
 
 .legend-label {
@@ -968,11 +1182,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #FFF;
+  background: rgba(18, 18, 34, 0.75);
   padding: 8px 14px;
   border-radius: 20px;
-  border: 1px solid #E0E0E0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   z-index: 10;
 }
 
@@ -996,7 +1212,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #E0E0E0;
+  background-color: rgba(255, 255, 255, 0.15);
   border-radius: 22px;
   transition: 0.3s;
 }
@@ -1008,22 +1224,23 @@ onUnmounted(() => {
   width: 16px;
   left: 3px;
   bottom: 3px;
-  background-color: white;
+  background-color: var(--sb-text);
   border-radius: 50%;
   transition: 0.3s;
 }
 
 input:checked + .slider {
-  background-color: #7B2D8E;
+  background: var(--sb-gradient);
 }
 
 input:checked + .slider:before {
   transform: translateX(18px);
+  background-color: #ffffff;
 }
 
 .toggle-label {
   font-size: 12px;
-  color: #666;
+  color: var(--sb-text-secondary);
 }
 
 /* Detail Panel - Right Side */
@@ -1033,12 +1250,14 @@ input:checked + .slider:before {
   right: 20px;
   width: 320px;
   max-height: calc(100% - 100px);
-  background: #FFF;
-  border: 1px solid #EAEAEA;
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  background: rgba(18, 18, 34, 0.88);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius-sm);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   overflow: hidden;
-  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  font-family: var(--sb-font-body);
   font-size: 13px;
   z-index: 20;
   display: flex;
@@ -1050,14 +1269,14 @@ input:checked + .slider:before {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  background: #FAFAFA;
-  border-bottom: 1px solid #EEE;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--sb-glass-border);
   flex-shrink: 0;
 }
 
 .detail-title {
   font-weight: 600;
-  color: #333;
+  color: var(--sb-text);
   font-size: 14px;
 }
 
@@ -1065,7 +1284,7 @@ input:checked + .slider:before {
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   margin-left: auto;
   margin-right: 12px;
 }
@@ -1075,14 +1294,14 @@ input:checked + .slider:before {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #999;
+  color: var(--sb-text-muted);
   line-height: 1;
   padding: 0;
   transition: color 0.2s;
 }
 
 .detail-close:hover {
-  color: #333;
+  color: var(--sb-text);
 }
 
 .detail-content {
@@ -1099,39 +1318,39 @@ input:checked + .slider:before {
 }
 
 .detail-label {
-  color: #888;
+  color: var(--sb-text-muted);
   font-size: 12px;
   font-weight: 500;
   min-width: 80px;
 }
 
 .detail-value {
-  color: #333;
+  color: var(--sb-text);
   flex: 1;
   word-break: break-word;
 }
 
 .detail-value.uuid-text {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-size: 11px;
-  color: #666;
+  color: var(--sb-text-secondary);
 }
 
 .detail-value.fact-text {
   line-height: 1.5;
-  color: #444;
+  color: var(--sb-text-secondary);
 }
 
 .detail-section {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #F0F0F0;
+  border-top: 1px solid var(--sb-glass-border);
 }
 
 .section-title {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--sb-text-secondary);
   margin-bottom: 10px;
 }
 
@@ -1147,19 +1366,19 @@ input:checked + .slider:before {
 }
 
 .property-key {
-  color: #888;
+  color: var(--sb-text-muted);
   font-weight: 500;
   min-width: 90px;
 }
 
 .property-value {
-  color: #333;
+  color: var(--sb-text);
   flex: 1;
 }
 
 .summary-text {
   line-height: 1.6;
-  color: #444;
+  color: var(--sb-text-secondary);
   font-size: 12px;
 }
 
@@ -1172,11 +1391,11 @@ input:checked + .slider:before {
 .label-tag {
   display: inline-block;
   padding: 4px 12px;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
   border-radius: 16px;
   font-size: 11px;
-  color: #555;
+  color: var(--sb-text-secondary);
 }
 
 .episodes-list {
@@ -1188,24 +1407,25 @@ input:checked + .slider:before {
 .episode-tag {
   display: inline-block;
   padding: 6px 10px;
-  background: #F8F8F8;
-  border: 1px solid #E8E8E8;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
   border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-size: 10px;
-  color: #666;
+  color: var(--sb-text-secondary);
   word-break: break-all;
 }
 
 /* Edge relation header */
 .edge-relation-header {
-  background: #F8F8F8;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 16px;
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: var(--sb-text);
   line-height: 1.5;
   word-break: break-word;
 }
@@ -1216,17 +1436,18 @@ input:checked + .slider:before {
   bottom: 160px; /* Moved up from 80px */
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(11, 11, 23, 0.75);
   backdrop-filter: blur(8px);
-  color: #fff;
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--sb-text);
   padding: 10px 20px;
   border-radius: 30px;
   font-size: 13px;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--sb-shadow);
+  border: 1px solid var(--sb-glass-border);
   font-weight: 500;
   letter-spacing: 0.5px;
   z-index: 100;
@@ -1242,18 +1463,18 @@ input:checked + .slider:before {
 .memory-icon {
   width: 18px;
   height: 18px;
-  color: #4CAF50;
+  color: var(--sb-success);
 }
 
 @keyframes breathe {
-  0%, 100% { opacity: 0.7; transform: scale(1); filter: drop-shadow(0 0 2px rgba(76, 175, 80, 0.3)); }
-  50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.6)); }
+  0%, 100% { opacity: 0.7; transform: scale(1); filter: drop-shadow(0 0 2px rgba(52, 211, 153, 0.3)); }
+  50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.6)); }
 }
 
 /* 模拟结束后的提示样式 */
 .graph-building-hint.finished-hint {
-  background: rgba(0, 0, 0, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(11, 11, 23, 0.75);
+  border: 1px solid var(--sb-glass-border);
 }
 
 .finished-hint .hint-icon-wrapper {
@@ -1265,7 +1486,7 @@ input:checked + .slider:before {
 .finished-hint .hint-icon {
   width: 18px;
   height: 18px;
-  color: #FFF;
+  color: var(--sb-text);
 }
 
 .finished-hint .hint-text {
@@ -1279,18 +1500,18 @@ input:checked + .slider:before {
   justify-content: center;
   width: 22px;
   height: 22px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #FFF;
+  color: var(--sb-text);
   transition: all 0.2s;
   margin-left: 8px;
   flex-shrink: 0;
 }
 
 .hint-close-btn:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.25);
   transform: scale(1.1);
 }
 
@@ -1298,8 +1519,8 @@ input:checked + .slider:before {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #E0E0E0;
-  border-top-color: #7B2D8E;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--sb-violet);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
@@ -1310,15 +1531,15 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 100%);
-  border: 1px solid #C8E6C9;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
 }
 
 .self-loop-count {
   margin-left: auto;
   font-size: 11px;
-  color: #666;
-  background: rgba(255,255,255,0.8);
+  color: var(--sb-text-secondary);
+  background: rgba(255, 255, 255, 0.08);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -1330,8 +1551,8 @@ input:checked + .slider:before {
 }
 
 .self-loop-item {
-  background: #FAFAFA;
-  border: 1px solid #EAEAEA;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
   border-radius: 8px;
 }
 
@@ -1340,24 +1561,24 @@ input:checked + .slider:before {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #F5F5F5;
+  background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .self-loop-item-header:hover {
-  background: #EEEEEE;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .self-loop-item.expanded .self-loop-item-header {
-  background: #E8E8E8;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .self-loop-index {
   font-size: 10px;
   font-weight: 600;
-  color: #888;
-  background: #E0E0E0;
+  color: var(--sb-text-secondary);
+  background: rgba(255, 255, 255, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -1365,7 +1586,7 @@ input:checked + .slider:before {
 .self-loop-name {
   font-size: 12px;
   font-weight: 500;
-  color: #333;
+  color: var(--sb-text);
   flex: 1;
 }
 
@@ -1377,20 +1598,20 @@ input:checked + .slider:before {
   justify-content: center;
   font-size: 14px;
   font-weight: 600;
-  color: #888;
-  background: #E0E0E0;
+  color: var(--sb-text-secondary);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   transition: all 0.2s;
 }
 
 .self-loop-item.expanded .self-loop-toggle {
-  background: #D0D0D0;
-  color: #666;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--sb-text);
 }
 
 .self-loop-item-content {
   padding: 12px;
-  border-top: 1px solid #EAEAEA;
+  border-top: 1px solid var(--sb-glass-border);
 }
 
 .self-loop-item-content .detail-row {

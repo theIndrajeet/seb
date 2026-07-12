@@ -4,11 +4,26 @@ LLM客户端封装
 """
 
 import json
+import logging
 import re
+import time
 from typing import Optional, Dict, Any, List
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from ..config import Config
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_retry_delay(error_message: str, default: float) -> float:
+    """从429错误信息中解析建议的重试等待秒数（Gemini返回 'retry in Ns'）"""
+    match = re.search(r'retry in ([0-9.]+)\s*s', error_message, re.IGNORECASE)
+    if match:
+        try:
+            return min(float(match.group(1)) + 1.0, 90.0)
+        except ValueError:
+            pass
+    return default
 
 
 class LLMClient:
@@ -60,8 +75,20 @@ class LLMClient:
         
         if response_format:
             kwargs["response_format"] = response_format
-        
-        response = self.client.chat.completions.create(**kwargs)
+
+        # 429限流：遵循服务端建议的等待时间重试（免费档RPM限制下必需）
+        max_attempts = 5
+        response = None
+        for attempt in range(max_attempts):
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                break
+            except RateLimitError as e:
+                if attempt == max_attempts - 1:
+                    raise
+                delay = _parse_retry_delay(str(e), default=15.0 * (attempt + 1))
+                logger.warning(f"LLM限流(429)，{delay:.0f}秒后重试 ({attempt + 1}/{max_attempts})")
+                time.sleep(delay)
         content = response.choices[0].message.content
         # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()

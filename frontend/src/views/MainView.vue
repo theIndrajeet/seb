@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH</div>
+        <div class="brand" @click="router.push('/')">SEBASTIAN</div>
       </div>
       
       <div class="header-center">
@@ -193,21 +193,24 @@ const initProject = async () => {
 
 const handleNewProject = async () => {
   const pending = getPendingUpload()
-  if (!pending.isPending || pending.files.length === 0) {
-    error.value = 'No pending files found.'
-    addLog('Error: No pending files found for new project.')
+  if (!pending.isPending || (pending.files.length === 0 && !pending.simulationRequirement?.trim())) {
+    error.value = 'No pending intake found.'
+    addLog('Error: No pending intake (files or description) found for new project.')
     return
   }
-  
+
   try {
     loading.value = true
     currentPhase.value = 0
-    ontologyProgress.value = { message: 'Uploading and analyzing docs...' }
-    addLog('Starting ontology generation: Uploading files...')
-    
+    const hasFiles = pending.files.length > 0
+    ontologyProgress.value = { message: hasFiles ? 'Uploading and analyzing docs...' : 'Analyzing your description...' }
+    addLog(hasFiles ? 'Starting ontology generation: Uploading files...' : 'Starting ontology generation: Text-only intake (no documents)...')
+
     const formData = new FormData()
     pending.files.forEach(f => formData.append('files', f))
     formData.append('simulation_requirement', pending.simulationRequirement)
+    if (pending.governingLaw) formData.append('governing_law', pending.governingLaw)
+    if (pending.reliefSought) formData.append('relief_sought', pending.reliefSought)
     
     const res = await generateOntology(formData)
     if (res.success) {
@@ -414,20 +417,23 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #FFF;
+  background: transparent;
   overflow: hidden;
-  font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
+  font-family: var(--sb-font-body);
+  color: var(--sb-text);
 }
 
 /* Header */
 .app-header {
   height: 60px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--sb-glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #FFF;
+  background: rgba(11, 11, 23, 0.55);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   z-index: 100;
   position: relative;
 }
@@ -439,18 +445,30 @@ onUnmounted(() => {
 }
 
 .brand {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 800;
+  font-family: var(--sb-font-display);
+  font-weight: 700;
   font-size: 18px;
-  letter-spacing: 1px;
+  letter-spacing: 0.16em;
   cursor: pointer;
+  background: var(--sb-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: opacity 0.2s;
+}
+
+.brand:hover {
+  opacity: 0.85;
 }
 
 .view-switcher {
   display: flex;
-  background: #F5F5F5;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 4px;
-  border-radius: 6px;
+  border-radius: 10px;
   gap: 4px;
 }
 
@@ -460,16 +478,18 @@ onUnmounted(() => {
   padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
-  border-radius: 4px;
+  font-family: var(--sb-font-display);
+  letter-spacing: 0.03em;
+  color: var(--sb-text-secondary);
+  border-radius: 7px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .switch-btn.active {
-  background: #FFF;
-  color: #000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--sb-gradient);
+  color: var(--sb-text-on-accent);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
 }
 
 .status-indicator {
@@ -477,7 +497,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--sb-text-secondary);
   font-weight: 500;
 }
 
@@ -495,32 +515,33 @@ onUnmounted(() => {
 }
 
 .step-num {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-weight: 700;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 .step-name {
   font-weight: 700;
-  color: #000;
+  font-family: var(--sb-font-display);
+  color: var(--sb-text);
 }
 
 .step-divider {
   width: 1px;
   height: 14px;
-  background-color: #E0E0E0;
+  background-color: var(--sb-glass-border);
 }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #CCC;
+  background: var(--sb-text-muted);
 }
 
-.status-indicator.processing .dot { background: #FF5722; animation: pulse 1s infinite; }
-.status-indicator.completed .dot { background: #4CAF50; }
-.status-indicator.error .dot { background: #F44336; }
+.status-indicator.processing .dot { background: var(--sb-violet); box-shadow: 0 0 8px rgba(139, 92, 246, 0.6); animation: pulse 1s infinite; }
+.status-indicator.completed .dot { background: var(--sb-success); }
+.status-indicator.error .dot { background: var(--sb-danger); }
 
 @keyframes pulse { 50% { opacity: 0.5; } }
 
@@ -540,6 +561,6 @@ onUnmounted(() => {
 }
 
 .panel-wrapper.left {
-  border-right: 1px solid #EAEAEA;
+  border-right: 1px solid var(--sb-glass-border);
 }
 </style>

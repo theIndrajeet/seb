@@ -605,9 +605,9 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
-    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 50px 50px;
   /* 从左上角开始定位，高度变化时只在底部扩展，不影响已有网格位置 */
   background-position: top left;
@@ -619,9 +619,9 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.9) 0%, transparent 15%, transparent 85%, rgba(255, 255, 255, 0.9) 100%),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 0%, transparent 20%, transparent 80%, rgba(255, 255, 255, 0.8) 100%);
+  background:
+    linear-gradient(to right, rgba(11, 11, 23, 0.9) 0%, transparent 15%, transparent 85%, rgba(11, 11, 23, 0.9) 100%),
+    linear-gradient(to bottom, rgba(11, 11, 23, 0.8) 0%, transparent 20%, transparent 80%, rgba(11, 11, 23, 0.8) 100%);
   pointer-events: none;
 }
 
@@ -641,14 +641,14 @@ onUnmounted(() => {
 .section-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #E5E7EB, transparent);
+  background: linear-gradient(90deg, transparent, var(--sb-glass-border), transparent);
   max-width: 300px;
 }
 
 .section-title {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #9CA3AF;
+  color: var(--sb-text-muted);
   letter-spacing: 3px;
   text-transform: uppercase;
 }
@@ -668,18 +668,22 @@ onUnmounted(() => {
 .project-card {
   position: absolute;
   width: 280px;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  border-radius: 0;
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 14px;
   cursor: pointer;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 700ms cubic-bezier(0.23, 1, 0.32, 1), opacity 700ms cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: var(--sb-shadow);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease, transform 700ms cubic-bezier(0.23, 1, 0.32, 1), opacity 700ms cubic-bezier(0.23, 1, 0.32, 1);
+  overflow: hidden;
 }
 
 .project-card:hover {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.4);
+  box-shadow: var(--sb-shadow), var(--sb-shadow-glow);
+  border-color: var(--sb-glass-border-strong);
+  background: var(--sb-glass-strong);
   z-index: 1000 !important;
 }
 
@@ -694,13 +698,13 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #F3F4F6;
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--sb-font-mono);
   font-size: 0.7rem;
 }
 
 .card-id {
-  color: #6B7280;
+  color: var(--sb-text-secondary);
   letter-spacing: 0.5px;
   font-weight: 500;
 }
@@ -723,12 +727,12 @@ onUnmounted(() => {
 }
 
 /* 不同功能的颜色 */
-.status-icon:nth-child(1).available { color: #3B82F6; } /* 图谱构建 - 蓝色 */
-.status-icon:nth-child(2).available { color: #F59E0B; } /* 环境搭建 - 橙色 */
-.status-icon:nth-child(3).available { color: #10B981; } /* 分析报告 - 绿色 */
+.status-icon:nth-child(1).available { color: var(--sb-info); }    /* 图谱构建 - 蓝色 */
+.status-icon:nth-child(2).available { color: var(--sb-warning); } /* 环境搭建 - 橙色 */
+.status-icon:nth-child(3).available { color: var(--sb-success); } /* 分析报告 - 绿色 */
 
 .status-icon.unavailable {
-  color: #D1D5DB;
+  color: var(--sb-text-muted);
   opacity: 0.5;
 }
 
@@ -747,10 +751,10 @@ onUnmounted(() => {
 }
 
 /* 进度状态颜色 */
-.card-progress.completed { color: #10B981; }    /* 已完成 - 绿色 */
-.card-progress.in-progress { color: #F59E0B; }  /* 进行中 - 橙色 */
-.card-progress.not-started { color: #9CA3AF; }  /* 未开始 - 灰色 */
-.card-status.pending { color: #9CA3AF; }
+.card-progress.completed { color: var(--sb-success); }      /* 已完成 - 绿色 */
+.card-progress.in-progress { color: var(--sb-warning); }    /* 进行中 - 橙色 */
+.card-progress.not-started { color: var(--sb-text-muted); } /* 未开始 - 灰色 */
+.card-status.pending { color: var(--sb-text-muted); }
 
 /* 文件列表区域 */
 .card-files-wrapper {
@@ -760,9 +764,9 @@ onUnmounted(() => {
   max-height: 110px;
   margin-bottom: 12px;
   padding: 8px 10px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
-  border-radius: 4px;
-  border: 1px solid #e8eaed;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--sb-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -778,10 +782,10 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 3px 6px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-size: 0.6rem;
-  color: #6B7280;
-  background: rgba(255, 255, 255, 0.5);
+  color: var(--sb-text-muted);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
   letter-spacing: 0.3px;
 }
@@ -791,15 +795,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
   transition: all 0.2s ease;
 }
 
 .file-item:hover {
-  background: rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.1);
   transform: translateX(2px);
-  border-color: #e5e7eb;
+  border-color: var(--sb-glass-border);
 }
 
 /* 简约文件标签样式 */

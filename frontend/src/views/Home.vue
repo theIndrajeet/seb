@@ -2,7 +2,7 @@
   <div class="home-container">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand">MIROFISH</div>
+      <div class="nav-brand">SEBASTIAN</div>
       <div class="nav-links">
         <LanguageSwitcher />
         <a href="https://github.com/666ghj/MiroFish" target="_blank" class="github-link">
@@ -44,7 +44,7 @@
         <div class="hero-right">
           <!-- Logo 区域 -->
           <div class="logo-container">
-            <img src="../assets/logo/MiroFish_logo_left.jpeg" alt="MiroFish Logo" class="hero-logo" />
+            <img src="../assets/logo/sebastian-logo.svg" alt="Sebastian Logo" class="hero-logo" />
           </div>
           
           <button class="scroll-down-btn" @click="scrollToBottom">
@@ -126,66 +126,105 @@
         <!-- 右栏：交互控制台 -->
         <div class="right-panel">
           <div class="console-box">
-            <!-- 上传区域 -->
-            <div class="console-section">
-              <div class="console-header">
-                <span class="console-label">{{ $t('home.realitySeed') }}</span>
-                <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
-              </div>
-              
-              <div 
-                class="upload-zone"
-                :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 }"
-                @dragover.prevent="handleDragOver"
-                @dragleave.prevent="handleDragLeave"
-                @drop.prevent="handleDrop"
-                @click="triggerFileInput"
-              >
-                <input
-                  ref="fileInput"
-                  type="file"
-                  multiple
-                  accept=".pdf,.md,.txt"
-                  @change="handleFileSelect"
-                  style="display: none"
-                  :disabled="loading"
-                />
-                
-                <div v-if="files.length === 0" class="upload-placeholder">
-                  <div class="upload-icon">↑</div>
-                  <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
-                  <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
-                </div>
-                
-                <div v-else class="file-list">
-                  <div v-for="(file, index) in files" :key="index" class="file-item">
-                    <span class="file-icon">📄</span>
-                    <span class="file-name">{{ file.name }}</span>
-                    <button @click.stop="removeFile(index)" class="remove-btn">×</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 分割线 -->
-            <div class="console-divider">
-              <span>{{ $t('home.inputParams') }}</span>
-            </div>
-
-            <!-- 输入区域 -->
+            <!-- 主输入区域：对话式提示（hero） -->
             <div class="console-section">
               <div class="console-header">
                 <span class="console-label">{{ $t('home.simulationPrompt') }}</span>
+                <span class="console-meta">{{ $t('home.engineBadge') }}</span>
               </div>
-              <div class="input-wrapper">
+              <div class="input-wrapper composer">
                 <textarea
                   v-model="formData.simulationRequirement"
                   class="code-input"
-                  :placeholder="$t('home.promptPlaceholder')"
-                  rows="6"
+                  :placeholder="$t('caseIntake.promptPlaceholder')"
+                  rows="8"
                   :disabled="loading"
                 ></textarea>
-                <div class="model-badge">{{ $t('home.engineBadge') }}</div>
+                <div class="composer-footer">
+                  <button
+                    type="button"
+                    class="attach-btn"
+                    :class="{ active: showAttachments || files.length > 0 }"
+                    :disabled="loading"
+                    @click="toggleAttachments"
+                  >
+                    <svg class="attach-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                    <span v-if="files.length === 0">{{ $t('caseIntake.attachToggle') }}</span>
+                    <span v-else>{{ $t('caseIntake.attachedCount', { count: files.length }) }}</span>
+                  </button>
+                  <span class="composer-formats">{{ $t('home.supportedFormats') }}</span>
+                </div>
+              </div>
+
+              <!-- 附件区（可折叠，上传逻辑保持不变） -->
+              <div v-show="showAttachments" class="attach-panel">
+                <div class="console-header attach-panel-header">
+                  <span class="console-label">{{ $t('home.realitySeed') }}</span>
+                  <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
+                </div>
+                <div
+                  class="upload-zone"
+                  :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 }"
+                  @dragover.prevent="handleDragOver"
+                  @dragleave.prevent="handleDragLeave"
+                  @drop.prevent="handleDrop"
+                  @click="triggerFileInput"
+                >
+                  <input
+                    ref="fileInput"
+                    type="file"
+                    multiple
+                    accept=".pdf,.md,.txt"
+                    @change="handleFileSelect"
+                    style="display: none"
+                    :disabled="loading"
+                  />
+
+                  <div v-if="files.length === 0" class="upload-placeholder">
+                    <div class="upload-icon">↑</div>
+                    <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
+                    <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
+                  </div>
+
+                  <div v-else class="file-list">
+                    <div v-for="(file, index) in files" :key="index" class="file-item">
+                      <span class="file-icon">📄</span>
+                      <span class="file-name">{{ file.name }}</span>
+                      <button @click.stop="removeFile(index)" class="remove-btn">×</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 无文书提示 -->
+              <div v-if="files.length === 0" class="no-docs-chip">
+                <span class="chip-dot">●</span>
+                <span>{{ $t('caseIntake.noDocsHint') }}</span>
+              </div>
+
+              <!-- 分割线 -->
+              <div class="console-divider">
+                <span>{{ $t('home.inputParams') }}</span>
+              </div>
+
+              <!-- 案件可选参数：管辖法律 / 请求救济 -->
+              <div class="case-fields-row">
+                <input
+                  v-model="formData.governingLaw"
+                  class="case-field-input"
+                  :placeholder="$t('caseIntake.governingLawPlaceholder')"
+                  :disabled="loading"
+                  type="text"
+                />
+                <input
+                  v-model="formData.reliefSought"
+                  class="case-field-input"
+                  :placeholder="$t('caseIntake.reliefPlaceholder')"
+                  :disabled="loading"
+                  type="text"
+                />
               </div>
             </div>
 
@@ -221,7 +260,9 @@ const router = useRouter()
 
 // 表单数据
 const formData = ref({
-  simulationRequirement: ''
+  simulationRequirement: '',
+  governingLaw: '',
+  reliefSought: ''
 })
 
 // 文件列表
@@ -232,13 +273,23 @@ const loading = ref(false)
 const error = ref('')
 const isDragOver = ref(false)
 
+// 附件区展开状态（文件为可选附件）
+const showAttachments = ref(false)
+
 // 文件输入引用
 const fileInput = ref(null)
 
-// 计算属性:是否可以提交
+// 计算属性:是否可以提交（仅需描述文本，文件为可选）
 const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
+  return formData.value.simulationRequirement.trim().length >= 20
 })
+
+// 展开/收起附件区
+const toggleAttachments = () => {
+  if (!loading.value) {
+    showAttachments.value = !showAttachments.value
+  }
+}
 
 // 触发文件选择
 const triggerFileInput = () => {
@@ -300,7 +351,12 @@ const startSimulation = () => {
   
   // 存储待上传的数据
   import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
+    setPendingUpload(
+      files.value,
+      formData.value.simulationRequirement,
+      formData.value.governingLaw,
+      formData.value.reliefSought
+    )
     
     // 立即跳转到Process页面（使用特殊标识表示新建项目）
     router.push({
@@ -312,35 +368,23 @@ const startSimulation = () => {
 </script>
 
 <style scoped>
-/* 全局变量与重置 */
-:root {
-  --black: #000000;
-  --white: #FFFFFF;
-  --orange: #FF4500;
-  --gray-light: #F5F5F5;
-  --gray-text: #666666;
-  --border: #E5E5E5;
-  /* 
-    使用 Space Grotesk 作为主要标题字体，JetBrains Mono 作为代码/标签字体
-    确保已在 index.html 引入这些 Google Fonts 
-  */
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
-  --font-cn: 'Noto Sans SC', system-ui, sans-serif;
-}
+/* Sebastian design system — all tokens come from assets/theme.css */
 
 .home-container {
   min-height: 100vh;
-  background: var(--white);
-  font-family: var(--font-sans);
-  color: var(--black);
+  background: transparent;
+  font-family: var(--sb-font-body);
+  color: var(--sb-text);
 }
 
 /* 顶部导航 */
 .navbar {
   height: 60px;
-  background: var(--black);
-  color: var(--white);
+  background: rgba(11, 11, 23, 0.55);
+  border-bottom: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  color: var(--sb-text);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -348,10 +392,14 @@ const startSimulation = () => {
 }
 
 .nav-brand {
-  font-family: var(--font-mono);
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: var(--sb-font-display);
+  font-weight: 700;
+  letter-spacing: 0.18em;
   font-size: 1.2rem;
+  background: var(--sb-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .nav-links {
@@ -361,19 +409,19 @@ const startSimulation = () => {
 }
 
 .github-link {
-  color: var(--white);
+  color: var(--sb-text-secondary);
   text-decoration: none;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.9rem;
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: opacity 0.2s;
+  transition: color 0.2s;
 }
 
 .github-link:hover {
-  opacity: 0.8;
+  color: var(--sb-text);
 }
 
 .arrow {
@@ -405,21 +453,24 @@ const startSimulation = () => {
   align-items: center;
   gap: 15px;
   margin-bottom: 25px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.8rem;
 }
 
 .orange-tag {
-  background: var(--orange);
-  color: var(--white);
-  padding: 4px 10px;
+  background: rgba(139, 92, 246, 0.14);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  border-radius: 999px;
+  color: var(--sb-text);
+  padding: 4px 12px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.15em;
   font-size: 0.75rem;
+  text-transform: uppercase;
 }
 
 .version-text {
-  color: #999;
+  color: var(--sb-text-muted);
   font-weight: 500;
   letter-spacing: 0.5px;
 }
@@ -430,12 +481,14 @@ const startSimulation = () => {
   font-weight: 500;
   margin: 0 0 40px 0;
   letter-spacing: -2px;
-  color: var(--black);
+  color: var(--sb-text);
+  font-family: var(--sb-font-display);
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #000000 0%, #444444 100%);
+  background: var(--sb-gradient-text);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
 }
@@ -443,7 +496,7 @@ const startSimulation = () => {
 .hero-desc {
   font-size: 1.05rem;
   line-height: 1.8;
-  color: var(--gray-text);
+  color: var(--sb-text-secondary);
   max-width: 640px;
   margin-bottom: 50px;
   font-weight: 400;
@@ -455,38 +508,43 @@ const startSimulation = () => {
 }
 
 .highlight-bold {
-  color: var(--black);
+  color: var(--sb-text);
   font-weight: 700;
 }
 
 .highlight-orange {
-  color: var(--orange);
   font-weight: 700;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
+  background: var(--sb-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .highlight-code {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--sb-glass-border);
   padding: 2px 6px;
-  border-radius: 2px;
-  font-family: var(--font-mono);
+  border-radius: 6px;
+  font-family: var(--sb-font-mono);
   font-size: 0.9em;
-  color: var(--black);
+  color: var(--sb-text);
   font-weight: 600;
 }
 
 .slogan-text {
   font-size: 1.2rem;
   font-weight: 520;
-  color: var(--black);
+  color: var(--sb-text);
+  font-family: var(--sb-font-display);
   letter-spacing: 1px;
-  border-left: 3px solid var(--orange);
+  border-left: 3px solid var(--sb-violet);
   padding-left: 15px;
   margin-top: 20px;
 }
 
 .blinking-cursor {
-  color: var(--orange);
+  color: var(--sb-violet);
   animation: blink 1s step-end infinite;
   font-weight: 700;
 }
@@ -499,7 +557,9 @@ const startSimulation = () => {
 .decoration-square {
   width: 16px;
   height: 16px;
-  background: var(--orange);
+  background: var(--sb-gradient);
+  border-radius: 4px;
+  box-shadow: var(--sb-shadow-glow);
 }
 
 .hero-right {
@@ -520,31 +580,38 @@ const startSimulation = () => {
 .hero-logo {
   max-width: 500px; /* 调整logo大小 */
   width: 100%;
+  border-radius: var(--sb-radius-lg);
+  filter: drop-shadow(0 0 36px rgba(124, 100, 246, 0.35));
 }
 
 .scroll-down-btn {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--sb-glass-border);
+  background: var(--sb-glass);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--orange);
+  color: var(--sb-violet);
   font-size: 1.2rem;
-  transition: all 0.2s;
+  transition: transform 0.25s var(--sb-ease), border-color 0.2s ease, box-shadow 0.25s var(--sb-ease);
 }
 
 .scroll-down-btn:hover {
-  border-color: var(--orange);
+  border-color: var(--sb-glass-border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--sb-shadow-glow);
 }
 
 /* Dashboard 双栏布局 */
 .dashboard-section {
   display: flex;
   gap: 60px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--sb-glass-border);
   padding-top: 60px;
   align-items: flex-start;
 }
@@ -561,9 +628,11 @@ const startSimulation = () => {
 }
 
 .panel-header {
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.8rem;
-  color: #999;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -571,7 +640,7 @@ const startSimulation = () => {
 }
 
 .status-dot {
-  color: var(--orange);
+  color: var(--sb-violet);
   font-size: 0.8rem;
 }
 
@@ -579,10 +648,12 @@ const startSimulation = () => {
   font-size: 2rem;
   font-weight: 520;
   margin: 0 0 15px 0;
+  font-family: var(--sb-font-display);
+  color: var(--sb-text);
 }
 
 .section-desc {
-  color: var(--gray-text);
+  color: var(--sb-text-secondary);
   margin-bottom: 25px;
   line-height: 1.6;
 }
@@ -594,34 +665,55 @@ const startSimulation = () => {
 }
 
 .metric-card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--sb-glass-border);
+  background: var(--sb-glass);
+  border-radius: var(--sb-radius);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 20px 30px;
   min-width: 150px;
+  transition: transform 0.25s var(--sb-ease), border-color 0.2s ease, box-shadow 0.25s var(--sb-ease);
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sb-glass-border-strong);
+  box-shadow: var(--sb-shadow-glow);
 }
 
 .metric-value {
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 1.8rem;
   font-weight: 520;
   margin-bottom: 5px;
+  background: var(--sb-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .metric-label {
   font-size: 0.85rem;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 /* 项目模拟步骤介绍 */
 .steps-container {
-  border: 1px solid var(--border);
+  border: 1px solid var(--sb-glass-border);
+  background: var(--sb-glass);
+  border-radius: var(--sb-radius);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 30px;
   position: relative;
 }
 
 .steps-header {
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.8rem;
-  color: #999;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
   margin-bottom: 25px;
   display: flex;
   align-items: center;
@@ -646,10 +738,10 @@ const startSimulation = () => {
 }
 
 .step-num {
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-weight: 700;
-  color: var(--black);
-  opacity: 0.3;
+  color: var(--sb-violet);
+  opacity: 0.75;
 }
 
 .step-info {
@@ -660,11 +752,13 @@ const startSimulation = () => {
   font-weight: 520;
   font-size: 1rem;
   margin-bottom: 4px;
+  font-family: var(--sb-font-display);
+  color: var(--sb-text);
 }
 
 .step-desc {
   font-size: 0.85rem;
-  color: var(--gray-text);
+  color: var(--sb-text-secondary);
 }
 
 /* 右侧交互控制台 */
@@ -673,7 +767,12 @@ const startSimulation = () => {
 }
 
 .console-box {
-  border: 1px solid #CCC; /* 外部实线 */
+  border: 1px solid var(--sb-glass-border); /* 外部实线 */
+  background: var(--sb-glass);
+  border-radius: var(--sb-radius-lg);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   padding: 8px; /* 内边距形成双重边框感 */
 }
 
@@ -689,13 +788,109 @@ const startSimulation = () => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 15px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.75rem;
-  color: #666;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* 对话式输入框 */
+.input-wrapper.composer .code-input {
+  min-height: 190px;
+}
+
+.composer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--sb-glass-border);
+}
+
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: 999px;
+  color: var(--sb-text-secondary);
+  font-family: var(--sb-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.attach-btn:hover:not(:disabled) {
+  border-color: var(--sb-violet);
+  color: var(--sb-text);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.attach-btn.active {
+  border-color: rgba(139, 92, 246, 0.45);
+  color: var(--sb-text);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.attach-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.attach-icon {
+  flex-shrink: 0;
+}
+
+.composer-formats {
+  font-family: var(--sb-font-mono);
+  font-size: 0.68rem;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.08em;
+}
+
+/* 可折叠附件面板 */
+.attach-panel {
+  margin-top: 14px;
+  border: 1px solid var(--sb-glass-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--sb-radius);
+  padding: 16px;
+}
+
+.attach-panel-header {
+  margin-bottom: 12px;
+}
+
+/* 无文书提示 */
+.no-docs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 5px 12px;
+  border: 1px solid var(--sb-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  font-family: var(--sb-font-mono);
+  font-size: 0.7rem;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.03em;
+}
+
+.no-docs-chip .chip-dot {
+  color: var(--sb-violet);
+  font-size: 0.55rem;
+  line-height: 1;
 }
 
 .upload-zone {
-  border: 1px dashed #CCC;
+  border: 1px dashed var(--sb-glass-border-strong);
+  border-radius: var(--sb-radius);
   height: 200px;
   overflow-y: auto;
   display: flex;
@@ -703,7 +898,7 @@ const startSimulation = () => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s;
-  background: #FAFAFA;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .upload-zone.has-files {
@@ -711,8 +906,13 @@ const startSimulation = () => {
 }
 
 .upload-zone:hover {
-  background: #F0F0F0;
-  border-color: #999;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--sb-violet);
+}
+
+.upload-zone.drag-over {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: var(--sb-violet);
 }
 
 .upload-placeholder {
@@ -722,24 +922,26 @@ const startSimulation = () => {
 .upload-icon {
   width: 40px;
   height: 40px;
-  border: 1px solid #DDD;
+  border: 1px solid var(--sb-glass-border);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 15px;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 .upload-title {
   font-weight: 500;
   font-size: 0.9rem;
   margin-bottom: 5px;
+  color: var(--sb-text);
 }
 
 .upload-hint {
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.75rem;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 .file-list {
@@ -753,11 +955,13 @@ const startSimulation = () => {
 .file-item {
   display: flex;
   align-items: center;
-  background: var(--white);
+  background: rgba(255, 255, 255, 0.05);
   padding: 8px 12px;
-  border: 1px solid #EEE;
-  font-family: var(--font-mono);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius-sm);
+  font-family: var(--sb-font-mono);
   font-size: 0.85rem;
+  color: var(--sb-text);
 }
 
 .file-name {
@@ -770,7 +974,12 @@ const startSimulation = () => {
   border: none;
   cursor: pointer;
   font-size: 1.2rem;
-  color: #999;
+  color: var(--sb-text-muted);
+  transition: color 0.2s;
+}
+
+.remove-btn:hover {
+  color: var(--sb-danger);
 }
 
 .console-divider {
@@ -784,21 +993,29 @@ const startSimulation = () => {
   content: '';
   flex: 1;
   height: 1px;
-  background: #EEE;
+  background: var(--sb-glass-border);
 }
 
 .console-divider span {
   padding: 0 15px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.7rem;
-  color: #BBB;
-  letter-spacing: 1px;
+  color: var(--sb-text-muted);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .input-wrapper {
   position: relative;
-  border: 1px solid #DDD;
-  background: #FAFAFA;
+  border: 1px solid var(--sb-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--sb-radius);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--sb-indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
 .code-input {
@@ -806,37 +1023,78 @@ const startSimulation = () => {
   border: none;
   background: transparent;
   padding: 20px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.9rem;
   line-height: 1.6;
   resize: vertical;
   outline: none;
   min-height: 150px;
+  color: var(--sb-text);
+  caret-color: var(--sb-violet);
+}
+
+.code-input::placeholder {
+  color: var(--sb-text-muted);
 }
 
 .model-badge {
   position: absolute;
   bottom: 10px;
   right: 15px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-mono);
   font-size: 0.7rem;
-  color: #AAA;
+  color: var(--sb-text-muted);
+}
+
+.case-fields-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.case-field-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-text);
+  font-family: var(--sb-font-body);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.case-field-input::placeholder {
+  color: var(--sb-text-muted);
+}
+
+.case-field-input:focus {
+  border-color: var(--sb-indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+@media (max-width: 720px) {
+  .case-fields-row {
+    flex-direction: column;
+  }
 }
 
 .start-engine-btn {
   width: 100%;
-  background: var(--black);
-  color: var(--white);
+  background: var(--sb-gradient);
+  color: var(--sb-text-on-accent);
   border: none;
+  border-radius: var(--sb-radius-sm);
   padding: 20px;
-  font-family: var(--font-mono);
+  font-family: var(--sb-font-display);
   font-weight: 700;
   font-size: 1.1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s var(--sb-ease);
   letter-spacing: 1px;
   position: relative;
   overflow: hidden;
@@ -844,15 +1102,12 @@ const startSimulation = () => {
 
 /* 可点击状态（非禁用） */
 .start-engine-btn:not(:disabled) {
-  background: var(--black);
-  border: 1px solid var(--black);
   animation: pulse-border 2s infinite;
 }
 
 .start-engine-btn:hover:not(:disabled) {
-  background: var(--orange);
-  border-color: var(--orange);
   transform: translateY(-2px);
+  box-shadow: var(--sb-shadow-glow);
 }
 
 .start-engine-btn:active:not(:disabled) {
@@ -860,18 +1115,18 @@ const startSimulation = () => {
 }
 
 .start-engine-btn:disabled {
-  background: #E5E5E5;
-  color: #999;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sb-text-muted);
   cursor: not-allowed;
   transform: none;
-  border: 1px solid #E5E5E5;
+  animation: none;
 }
 
 /* 引导动画：微妙的边框脉冲 */
 @keyframes pulse-border {
-  0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
-  70% { box-shadow: 0 0 0 6px rgba(0, 0, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
 }
 
 /* 响应式适配 */
@@ -900,32 +1155,32 @@ const startSimulation = () => {
 /* English locale adjustments (unscoped to target html[lang]) */
 html[lang="en"] .main-title {
   font-size: 3.5rem;
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-display);
   letter-spacing: -1px;
 }
 
 html[lang="en"] .hero-desc {
   text-align: left;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
   letter-spacing: 0;
 }
 
 html[lang="en"] .slogan-text {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
   letter-spacing: 0;
 }
 
 html[lang="en"] .tag-row {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
 }
 
 html[lang="en"] .navbar .nav-links {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
 }
 
 /* Left pane: system status + workflow */
 html[lang="en"] .status-section {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
 }
 
 html[lang="en"] .status-section .status-ready {
@@ -933,21 +1188,21 @@ html[lang="en"] .status-section .status-ready {
 }
 
 html[lang="en"] .status-section .metric-value {
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-display);
   font-size: 1.4rem;
 }
 
 html[lang="en"] .workflow-list .step-title {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
 }
 
 html[lang="en"] .workflow-list .step-desc {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: var(--sb-font-body) !important;
   font-size: 0.72rem !important;
   line-height: 1.4 !important;
 }
 
 html[lang="en"] .workflow-list {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sb-font-body);
 }
 </style>

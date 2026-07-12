@@ -13,6 +13,7 @@ from ..services.zep_entity_reader import ZepEntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
+from ..services.verdict_extractor import VerdictExtractor, load_verdict
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
 from ..models.project import ProjectManager
@@ -1535,6 +1536,13 @@ def start_simulation():
                 "error": t('api.simulationNotFound', id=simulation_id)
             }), 404
 
+        # 单平台模拟时自动纠正 platform（仲裁模式仅启用 Reddit）
+        if platform == 'parallel':
+            if state.enable_reddit and not state.enable_twitter:
+                platform = 'reddit'
+            elif state.enable_twitter and not state.enable_reddit:
+                platform = 'twitter'
+
         force_restarted = False
         
         # 智能处理状态：如果准备工作已完成，允许重新启动
@@ -2579,6 +2587,57 @@ def get_interview_history():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+@simulation_bp.route('/<simulation_id>/verdict', methods=['POST'])
+def extract_verdict(simulation_id: str):
+    """
+    仲裁模式：采访3名仲裁员收集结构化选票并聚合为裁决预测
+
+    要求模拟已完成且环境处于等待命令模式（env alive）。
+    结果持久化为模拟目录下的 verdict.json。
+    """
+    try:
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({"success": False, "error": t('api.simulationNotFound', id=simulation_id)}), 404
+
+        project = ProjectManager.get_project(state.project_id) if state.project_id else None
+        case_meta = project.case_meta if project else None
+        if not case_meta:
+            return jsonify({
+                "success": False,
+                "error": "This simulation is not an arbitration matter (no case_meta on project)."
+            }), 400
+
+        extractor = VerdictExtractor()
+        verdict = extractor.extract(simulation_id=simulation_id, case_meta=case_meta)
+
+        return jsonify({"success": True, "data": verdict})
+
+    except Exception as e:
+        logger.error(f"裁决提取失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/<simulation_id>/verdict', methods=['GET'])
+def get_verdict(simulation_id: str):
+    """获取已提取的裁决预测（verdict.json）"""
+    try:
+        verdict = load_verdict(simulation_id)
+        if verdict is None:
+            return jsonify({
+                "success": False,
+                "error": "Verdict not yet extracted for this simulation."
+            }), 404
+        return jsonify({"success": True, "data": verdict})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @simulation_bp.route('/env-status', methods=['POST'])

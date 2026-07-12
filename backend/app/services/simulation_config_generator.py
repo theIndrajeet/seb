@@ -172,7 +172,11 @@ class SimulationParameters:
     # 生成元数据
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     generation_reasoning: str = ""  # LLM的推理说明
-    
+
+    # 仲裁模式：mode="arbitration" 时 phases 定义庭审阶段日程
+    mode: str = "social"
+    phases: List[Dict[str, Any]] = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         time_dict = asdict(self.time_config)
@@ -180,6 +184,8 @@ class SimulationParameters:
             "simulation_id": self.simulation_id,
             "project_id": self.project_id,
             "graph_id": self.graph_id,
+            "mode": self.mode,
+            "phases": self.phases,
             "simulation_requirement": self.simulation_requirement,
             "time_config": time_dict,
             "agent_configs": [asdict(a) for a in self.agent_configs],
@@ -378,6 +384,141 @@ class SimulationConfigGenerator:
         
         return params
     
+    # ================= 仲裁模式 =================
+
+    # 庭审阶段日程（轮次为1起始；speakers 为 agent_id：0-2 仲裁员，3 申请人律师，4 被申请人律师）
+    ARBITRATION_PHASES = [
+        {"name": "opening_claimant", "title": "Opening Statement — Claimant", "rounds": [1], "speakers": [3],
+         "announcement": "PROCEDURAL NOTICE — Phase: OPENING STATEMENTS. The Tribunal invites Claimant's counsel to present their opening statement, summarizing the claims, the relief sought, and the evidence to be relied upon."},
+        {"name": "opening_respondent", "title": "Opening Statement — Respondent", "rounds": [2], "speakers": [4],
+         "announcement": "PROCEDURAL NOTICE — The Tribunal invites Respondent's counsel to present their opening statement, summarizing the defenses and any counterclaims."},
+        {"name": "claimant_case", "title": "Claimant's Case", "rounds": [3, 4], "speakers": [3],
+         "announcement": "PROCEDURAL NOTICE — Phase: CLAIMANT'S SUBMISSIONS. Claimant's counsel shall develop each claim in detail: the applicable contractual clauses, the governing law, and the supporting evidence."},
+        {"name": "respondent_case", "title": "Respondent's Case", "rounds": [5, 6], "speakers": [4],
+         "announcement": "PROCEDURAL NOTICE — Phase: RESPONDENT'S SUBMISSIONS. Respondent's counsel shall respond to each claim and develop the defenses, with supporting clauses, law and evidence."},
+        {"name": "tribunal_questions", "title": "Tribunal Questions", "rounds": [7, 8], "speakers": [0, 1, 2, 3, 4],
+         "announcement": "PROCEDURAL NOTICE — Phase: TRIBUNAL QUESTIONS. The members of the Tribunal will now put questions to both parties. Counsel shall answer the questions directed at their side fully and precisely."},
+        {"name": "closing_claimant", "title": "Closing — Claimant", "rounds": [9], "speakers": [3],
+         "announcement": "PROCEDURAL NOTICE — Phase: CLOSING STATEMENTS. Claimant's counsel shall present closing submissions, addressing the Tribunal's concerns raised during questioning."},
+        {"name": "closing_respondent", "title": "Closing — Respondent", "rounds": [10], "speakers": [4],
+         "announcement": "PROCEDURAL NOTICE — Respondent's counsel shall present closing submissions."},
+        {"name": "deliberation", "title": "Tribunal Deliberation", "rounds": [11, 12], "speakers": [0, 1, 2],
+         "announcement": "PROCEDURAL NOTICE — Phase: DELIBERATION (Tribunal only). The Tribunal will now deliberate. Each arbitrator shall state their provisional findings on each claim with reasons, engage with the views of their co-arbitrators, and indicate their position on liability and quantum. Counsel shall not intervene."},
+    ]
+
+    PROCEDURAL_ORDER_PROMPT = """You are the Presiding Arbitrator of a three-member tribunal in a commercial arbitration. Draft "Procedural Order No. 1 and Statement of Issues" as the opening post of the proceedings. Output valid JSON only: {"content": "..."}.
+
+The order must contain:
+1. A short recital: parties (Claimant / Respondent), governing law, seat and rules if known.
+2. STATEMENT OF ISSUES: number each disputed issue derived from the claims and defenses (these definitions will structure the whole proceeding — be precise).
+3. One sentence noting the phases: openings, party submissions, tribunal questions, closings, deliberation.
+
+Keep it under 400 words, formal arbitral register, grounded strictly in the case context provided. Refer to parties as Claimant/Respondent (with names in parentheses on first use)."""
+
+    def generate_arbitration_config(
+        self,
+        simulation_id: str,
+        project_id: str,
+        graph_id: str,
+        simulation_requirement: str,
+        case_meta: Dict[str, Any],
+        profiles: List[Any],
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> SimulationParameters:
+        """
+        生成仲裁模式配置：固定12轮庭审阶段日程 + LLM生成第一号程序令。
+        agent_configs 与面板 profiles 一一对应（0-2仲裁员，3-4律师）。
+        """
+        from .case_intake import format_case_context
+
+        if progress_callback:
+            progress_callback(1, 2, "Generating Procedural Order No. 1")
+
+        # 一次LLM调用：生成第一号程序令（含争议焦点清单）
+        case_context = format_case_context(case_meta)
+        try:
+            result = self._call_llm_with_retry(
+                prompt=f"## Case context\n{case_context}\n\n## Matter description\n{simulation_requirement}",
+                system_prompt=self.PROCEDURAL_ORDER_PROMPT,
+            )
+            procedural_order = result.get("content", "")
+        except Exception as e:
+            logger.warning(f"Procedural order generation failed, using fallback: {e}")
+            procedural_order = ""
+        if not procedural_order:
+            claims = "; ".join(c.get("title", "") for c in case_meta.get("claims", []))
+            procedural_order = (
+                "PROCEDURAL ORDER No. 1 — This Tribunal is constituted to decide the dispute between "
+                f"{case_meta.get('claimant', 'Claimant')} (Claimant) and {case_meta.get('respondent', 'Respondent')} (Respondent), "
+                f"governed by {case_meta.get('governing_law', 'the applicable law')}. "
+                f"STATEMENT OF ISSUES: {claims or 'as per the parties’ submissions'}. "
+                "The proceedings will move through openings, party submissions, tribunal questions, closings and deliberation."
+            )
+
+        # 时间配置：12轮 = 12个模拟小时，每轮60分钟
+        time_config = TimeSimulationConfig(
+            total_simulation_hours=12,
+            minutes_per_round=60,
+            agents_per_hour_min=1,
+            agents_per_hour_max=5,
+            peak_hours=[], off_peak_hours=[],
+        )
+
+        # Agent配置与面板一一对应
+        stance_by_role = {"Arbitrator": "neutral", "Counsel": None}
+        agent_configs = []
+        for p in profiles:
+            role = getattr(p, "source_entity_type", "") or ""
+            if role == "Counsel":
+                stance = "supportive" if "claimant" in p.user_name else "opposing"
+            else:
+                stance = "neutral"
+            agent_configs.append(AgentActivityConfig(
+                agent_id=p.user_id,
+                entity_uuid=getattr(p, "source_entity_uuid", None) or f"panel_{p.user_id}",
+                entity_name=p.name,
+                entity_type=role or "Panelist",
+                activity_level=1.0,
+                posts_per_hour=1.0,
+                comments_per_hour=2.0,
+                active_hours=list(range(24)),
+                sentiment_bias=0.0,
+                stance=stance,
+                influence_weight=1.0,
+            ))
+
+        event_config = EventConfig(
+            initial_posts=[{
+                "content": procedural_order,
+                "poster_agent_id": 0,
+                "poster_type": "Arbitrator",
+            }],
+            hot_topics=[c.get("title", "") for c in case_meta.get("claims", []) if c.get("title")],
+            narrative_direction="",
+        )
+
+        if progress_callback:
+            progress_callback(2, 2, "Arbitration schedule ready")
+
+        params = SimulationParameters(
+            simulation_id=simulation_id,
+            project_id=project_id,
+            graph_id=graph_id,
+            simulation_requirement=simulation_requirement,
+            time_config=time_config,
+            agent_configs=agent_configs,
+            event_config=event_config,
+            twitter_config=None,
+            reddit_config=PlatformConfig(platform="reddit"),
+            llm_model=self.model_name,
+            llm_base_url=self.base_url,
+            generation_reasoning="Arbitration mode: fixed 12-round hearing schedule (openings, submissions, tribunal questions, closings, deliberation).",
+            mode="arbitration",
+            phases=[dict(p) for p in self.ARBITRATION_PHASES],
+        )
+        logger.info(f"仲裁模式配置生成完成: {len(agent_configs)} 个面板成员, {len(params.phases)} 个庭审阶段")
+        return params
+
     def _build_context(
         self,
         simulation_requirement: str,

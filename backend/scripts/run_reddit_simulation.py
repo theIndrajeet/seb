@@ -466,15 +466,59 @@ class RedditSimulationRunner:
             model_type=llm_model,
         )
     
+    def _get_arbitration_phase(self, round_num: int) -> Dict[str, Any]:
+        """仲裁模式：返回当前轮所属的庭审阶段（轮次1起始）"""
+        current_round = round_num + 1
+        for phase in self.config.get("phases", []):
+            if current_round in phase.get("rounds", []):
+                return phase
+        return {}
+
+    def _get_arbitration_agents_for_round(self, env, round_num: int) -> List:
+        """仲裁模式：按庭审阶段日程激活发言人"""
+        phase = self._get_arbitration_phase(round_num)
+        speakers = phase.get("speakers", [])
+        active_agents = []
+        for agent_id in speakers:
+            try:
+                agent = env.agent_graph.get_agent(agent_id)
+                active_agents.append((agent_id, agent))
+            except Exception:
+                pass
+        return active_agents
+
+    async def _announce_phase_if_needed(self, round_num: int):
+        """仲裁模式：阶段首轮由首席仲裁员发布程序通知"""
+        phase = self._get_arbitration_phase(round_num)
+        if not phase or not phase.get("announcement"):
+            return
+        if (round_num + 1) != phase.get("rounds", [0])[0]:
+            return
+        try:
+            presiding = self.env.agent_graph.get_agent(0)
+            await self.env.step({
+                presiding: ManualAction(
+                    action_type=ActionType.CREATE_POST,
+                    action_args={"content": phase["announcement"]}
+                )
+            })
+            print(f"  [Phase] {phase.get('title', phase.get('name'))} — procedural notice posted")
+        except Exception as e:
+            print(f"  警告: 阶段通知发布失败: {e}")
+
     def _get_active_agents_for_round(
-        self, 
-        env, 
+        self,
+        env,
         current_hour: int,
         round_num: int
     ) -> List:
         """
         根据时间和配置决定本轮激活哪些Agent
         """
+        # 仲裁模式：按庭审阶段日程激活，而非按作息时间随机采样
+        if self.config.get("mode") == "arbitration" and self.config.get("phases"):
+            return self._get_arbitration_agents_for_round(env, round_num)
+
         time_config = self.config.get("time_config", {})
         agent_configs = self.config.get("agent_configs", [])
         
@@ -574,11 +618,13 @@ class RedditSimulationRunner:
             print(f"已删除旧数据库: {db_path}")
         
         print("创建OASIS环境...")
+        # 仲裁模式：面板只有5个Agent且免费档LLM限速严格，压低并发
+        arbitration = self.config.get("mode") == "arbitration"
         self.env = oasis.make(
             agent_graph=self.agent_graph,
             platform=oasis.DefaultPlatformType.REDDIT,
             database_path=db_path,
-            semaphore=30,  # 限制最大并发 LLM 请求数，防止 API 过载
+            semaphore=2 if arbitration else 30,  # 限制最大并发 LLM 请求数，防止 API 过载
         )
         
         await self.env.reset()
@@ -623,11 +669,17 @@ class RedditSimulationRunner:
         print("\n开始模拟循环...")
         start_time = datetime.now()
         
+        arbitration_mode = self.config.get("mode") == "arbitration" and self.config.get("phases")
+
         for round_num in range(total_rounds):
             simulated_minutes = round_num * minutes_per_round
             simulated_hour = (simulated_minutes // 60) % 24
             simulated_day = simulated_minutes // (60 * 24) + 1
-            
+
+            # 仲裁模式：阶段首轮先发布程序通知
+            if arbitration_mode:
+                await self._announce_phase_if_needed(round_num)
+
             active_agents = self._get_active_agents_for_round(
                 self.env, simulated_hour, round_num
             )
@@ -639,8 +691,13 @@ class RedditSimulationRunner:
                 agent: LLMAction()
                 for _, agent in active_agents
             }
-            
+
             await self.env.step(actions)
+
+            # 仲裁模式：轮间限速，避免触发免费档 RPM 限制
+            if arbitration_mode:
+                delay = self.config.get("round_delay_seconds", 25)
+                await asyncio.sleep(delay)
             
             if (round_num + 1) % 10 == 0 or round_num == 0:
                 elapsed = (datetime.now() - start_time).total_seconds()

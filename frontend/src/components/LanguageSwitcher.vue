@@ -63,61 +63,73 @@ onUnmounted(() => {
 .language-switcher {
   position: relative;
   display: inline-block;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
 }
 
-/* Light theme (default - for white header backgrounds) */
+/* Glass pill trigger (for dark glass header backgrounds) */
 .switcher-trigger {
-  background: transparent;
-  color: #333;
-  border: 1px solid #CCC;
+  background: var(--sb-glass);
+  color: var(--sb-text-secondary);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: 999px;
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 4px 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-size: 0.8rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: border-color 0.2s, opacity 0.2s;
+  transition: border-color 0.2s, background 0.2s, color 0.2s, opacity 0.2s;
 }
 
 .switcher-trigger:hover {
-  border-color: #999;
+  border-color: var(--sb-glass-border-strong);
+  background: var(--sb-glass-strong);
+  color: var(--sb-text);
 }
 
 .caret {
   font-size: 0.6rem;
+  color: var(--sb-text-muted);
 }
 
 .switcher-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 4px;
-  background: #FFFFFF;
-  border: 1px solid #DDD;
+  margin-top: 6px;
+  background: rgba(18, 18, 34, 0.85);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius-sm);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   list-style: none;
   padding: 4px 0;
   min-width: 100%;
   z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--sb-shadow);
+  overflow: hidden;
 }
 
 .switcher-option {
   padding: 6px 12px;
   font-size: 0.8rem;
-  color: #333;
+  color: var(--sb-text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .switcher-option:hover {
-  background: #F0F0F0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sb-text);
 }
 
 .switcher-option.active {
-  color: var(--orange, #FF4500);
+  color: var(--sb-violet);
+  font-weight: 600;
 }
 
 

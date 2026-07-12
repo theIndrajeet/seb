@@ -11,6 +11,7 @@ from flask import request, jsonify
 from . import graph_bp
 from ..config import Config
 from ..services.ontology_generator import OntologyGenerator
+from ..services.case_intake import CaseIntakeAnalyzer, format_case_context
 from ..services.graph_builder import GraphBuilderService
 from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
@@ -154,6 +155,8 @@ def generate_ontology():
         simulation_requirement = request.form.get('simulation_requirement', '')
         project_name = request.form.get('project_name', 'Unnamed Project')
         additional_context = request.form.get('additional_context', '')
+        governing_law = request.form.get('governing_law', '')
+        relief_sought = request.form.get('relief_sought', '')
         
         logger.debug(f"项目名称: {project_name}")
         logger.debug(f"模拟需求: {simulation_requirement[:100]}...")
@@ -164,9 +167,10 @@ def generate_ontology():
                 "error": t('api.requireSimulationRequirement')
             }), 400
         
-        # 获取上传的文件
+        # 获取上传的文件（可选：无文件时以用户输入的文字描述作为案件材料）
         uploaded_files = request.files.getlist('files')
-        if not uploaded_files or all(not f.filename for f in uploaded_files):
+        has_files = uploaded_files and any(f.filename for f in uploaded_files)
+        if not has_files and len(simulation_requirement.strip()) < 20:
             return jsonify({
                 "success": False,
                 "error": t('api.requireFileUpload')
@@ -200,6 +204,13 @@ def generate_ontology():
                 document_texts.append(text)
                 all_text += f"\n\n=== {file_info['original_filename']} ===\n{text}"
         
+        # 纯文字受理：将用户输入的描述本身作为案件材料
+        if not document_texts and not has_files:
+            typed_text = TextProcessor.preprocess_text(simulation_requirement)
+            document_texts.append(typed_text)
+            all_text = f"\n\n=== Matter description (typed) ===\n{typed_text}"
+            project.files.append({"filename": "typed_matter.txt", "size": len(typed_text)})
+
         if not document_texts:
             ProjectManager.delete_project(project.project_id)
             return jsonify({
@@ -212,13 +223,26 @@ def generate_ontology():
         ProjectManager.save_extracted_text(project.project_id, all_text)
         logger.info(f"文本提取完成，共 {len(all_text)} 字符")
         
-        # 生成本体
+        # 案件受理分析：提取管辖法律、当事人、诉请结构
+        logger.info("调用 LLM 进行案件受理分析...")
+        intake_analyzer = CaseIntakeAnalyzer()
+        case_meta = intake_analyzer.analyze(
+            document_texts=document_texts,
+            matter_description=simulation_requirement,
+            governing_law_override=governing_law if governing_law else None,
+            relief_sought=relief_sought if relief_sought else None
+        )
+        project.case_meta = case_meta
+
+        # 生成本体（附带案件上下文，使本体感知管辖法律与当事人）
         logger.info("调用 LLM 生成本体定义...")
+        case_context = format_case_context(case_meta)
+        combined_context = f"{case_context}\n\n{additional_context}".strip() if additional_context else case_context
         generator = OntologyGenerator()
         ontology = generator.generate(
             document_texts=document_texts,
             simulation_requirement=simulation_requirement,
-            additional_context=additional_context if additional_context else None
+            additional_context=combined_context if combined_context else None
         )
         
         # 保存本体到项目
@@ -242,6 +266,7 @@ def generate_ontology():
                 "project_name": project.name,
                 "ontology": project.ontology,
                 "analysis_summary": project.analysis_summary,
+                "case_meta": project.case_meta,
                 "files": project.files,
                 "total_text_length": project.total_text_length
             }

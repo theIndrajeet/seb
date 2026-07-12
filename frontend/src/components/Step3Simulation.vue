@@ -3,13 +3,13 @@
     <!-- Top Control Bar -->
     <div class="control-bar">
       <div class="status-group">
-        <!-- Twitter 平台进度 -->
-        <div class="platform-status twitter" :class="{ active: runStatus.twitter_running, completed: runStatus.twitter_completed }">
+        <!-- Twitter 平台进度（仲裁/纯Reddit模拟时隐藏） -->
+        <div v-if="!isRedditOnly" class="platform-status twitter" :class="{ active: runStatus.twitter_running, completed: runStatus.twitter_completed }">
           <div class="platform-header">
             <svg class="platform-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
-            <span class="platform-name">Info Plaza</span>
+            <span class="platform-name">Plenary Session</span>
             <span v-if="runStatus.twitter_completed" class="status-badge">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -50,7 +50,7 @@
             <svg class="platform-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
             </svg>
-            <span class="platform-name">Topic Community</span>
+            <span class="platform-name">Chambers Deliberation</span>
             <span v-if="runStatus.reddit_completed" class="status-badge">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -108,8 +108,8 @@
       <!-- Timeline Header -->
       <div class="timeline-header" v-if="allActions.length > 0">
         <div class="timeline-stats">
-          <span class="total-count">TOTAL EVENTS: <span class="mono">{{ allActions.length }}</span></span>
-          <span class="platform-breakdown">
+          <span class="total-count">TRANSCRIPT ENTRIES: <span class="mono">{{ allActions.length }}</span></span>
+          <span class="platform-breakdown" v-if="!isRedditOnly">
             <span class="breakdown-item twitter">
               <svg class="mini-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
               <span class="mono">{{ twitterActionsCount }}</span>
@@ -124,7 +124,7 @@
       </div>
       
       <!-- Timeline Feed -->
-      <div class="timeline-feed">
+      <div class="timeline-feed" :class="{ 'single-platform': isRedditOnly }">
         <div class="timeline-axis"></div>
         
         <TransitionGroup name="timeline-item">
@@ -138,11 +138,16 @@
               <div class="marker-dot"></div>
             </div>
             
-            <div class="timeline-card">
+            <div class="timeline-card" :class="{ procedural: isProcedural(action) }">
               <div class="card-header">
                 <div class="agent-info">
                   <div class="avatar-placeholder">{{ (action.agent_name || 'A')[0] }}</div>
                   <span class="agent-name">{{ action.agent_name }}</span>
+                  <span
+                    v-if="roleForAuthor(action.agent_name)"
+                    class="role-badge"
+                    :class="`role-${roleForAuthor(action.agent_name)}`"
+                  >{{ roleLabel(roleForAuthor(action.agent_name)) }}</span>
                 </div>
                 
                 <div class="header-meta">
@@ -264,7 +269,7 @@
 
         <div v-if="allActions.length === 0" class="waiting-state">
           <div class="pulse-ring"></div>
-          <span>Waiting for agent actions...</span>
+          <span>Awaiting tribunal deliberation...</span>
         </div>
       </div>
     </div>
@@ -272,8 +277,8 @@
     <!-- Bottom Info / Logs -->
     <div class="system-logs">
       <div class="log-header">
-        <span class="log-title">SIMULATION MONITOR</span>
-        <span class="log-id">{{ simulationId || 'NO_SIMULATION' }}</span>
+        <span class="log-title">DELIBERATION MONITOR</span>
+        <span class="log-id">{{ simulationId || 'NO_SESSION' }}</span>
       </div>
       <div class="log-content" ref="logContent">
         <div class="log-line" v-for="(log, idx) in systemLogs" :key="idx">
@@ -293,7 +298,9 @@ import {
   startSimulation,
   stopSimulation,
   getRunStatus,
-  getRunStatusDetail
+  getRunStatusDetail,
+  getSimulation,
+  getSimulationConfig
 } from '../api/simulation'
 import { generateReport } from '../api/report'
 
@@ -325,6 +332,24 @@ const runStatus = ref({})
 const allActions = ref([]) // 所有动作（增量累积）
 const actionIds = ref(new Set()) // 用于去重的动作ID集合
 const scrollContainer = ref(null)
+const isRedditOnly = ref(false) // 仲裁/纯Reddit模拟：隐藏Twitter时间线
+
+// 检测是否为纯Reddit（仲裁）模拟：state.enable_twitter=false 或 config.mode='arbitration'
+// 检测失败时保持双平台布局
+const detectSimulationMode = async () => {
+  if (!props.simulationId) return
+  try {
+    const [stateRes, configRes] = await Promise.all([
+      getSimulation(props.simulationId).catch(() => null),
+      getSimulationConfig(props.simulationId).catch(() => null)
+    ])
+    const twitterDisabled = stateRes?.success && stateRes.data?.enable_twitter === false
+    const arbitrationMode = configRes?.success && configRes.data?.mode === 'arbitration'
+    isRedditOnly.value = Boolean(twitterDisabled || arbitrationMode)
+  } catch (err) {
+    console.warn('检测模拟模式失败:', err)
+  }
+}
 
 // Computed
 // 按时间顺序显示动作（最新的在最后面，即底部）
@@ -429,9 +454,18 @@ const doStartSimulation = async () => {
       emit('update-status', 'error')
     }
   } catch (err) {
-    startError.value = err.message
-    addLog(t('log.startException', { error: err.message }))
-    emit('update-status', 'error')
+    // 后端返回400通常表示模拟已在运行：恢复观看而非报错
+    if (err?.response?.status === 400) {
+      addLog(t('log.engineStarted'))
+      phase.value = 1
+      startStatusPolling()
+      startDetailPolling()
+      emit('update-status', 'processing')
+    } else {
+      startError.value = err.message
+      addLog(t('log.startException', { error: err.message }))
+      emit('update-status', 'error')
+    }
   } finally {
     isStarting.value = false
   }
@@ -626,6 +660,35 @@ const getActionTypeClass = (type) => {
   return classes[type] || 'badge-default'
 }
 
+// 发言人角色识别（纯函数，仅用于展示角色徽章）
+const roleForAuthor = (name) => {
+  const n = (name || '').toLowerCase()
+  if (n.includes('arbitrator') || n.includes('presiding')) return 'arbitrator'
+  if (n.includes('counsel')) {
+    if (n.includes('claimant')) return 'claimant'
+    if (n.includes('respondent')) return 'respondent'
+    return 'counsel'
+  }
+  if (n.includes('claimant')) return 'claimant'
+  if (n.includes('respondent')) return 'respondent'
+  return null
+}
+
+const ROLE_LABELS = {
+  arbitrator: 'Arbitrator',
+  claimant: 'Claimant Counsel',
+  respondent: 'Respondent Counsel',
+  counsel: 'Counsel'
+}
+
+const roleLabel = (role) => ROLE_LABELS[role] || ''
+
+// 程序性通知检测（内容以 PROCEDURAL 开头的条目）
+const isProcedural = (action) => {
+  const c = action?.action_args?.content
+  return typeof c === 'string' && c.trimStart().startsWith('PROCEDURAL')
+}
+
 const truncateContent = (content, maxLength = 100) => {
   if (!content) return ''
   if (content.length > maxLength) return content.substring(0, maxLength) + '...'
@@ -690,6 +753,7 @@ watch(() => props.systemLogs?.length, () => {
 onMounted(() => {
   addLog(t('log.step3Init'))
   if (props.simulationId) {
+    detectSimulationMode()
     doStartSimulation()
   }
 })
@@ -704,19 +768,22 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #FFFFFF;
-  font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
+  background: transparent;
+  font-family: var(--sb-font-display);
+  color: var(--sb-text);
   overflow: hidden;
 }
 
 /* --- Control Bar --- */
 .control-bar {
-  background: #FFF;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 12px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--sb-glass-border);
   z-index: 10;
   height: 64px;
 }
@@ -732,9 +799,11 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
   padding: 6px 12px;
-  border-radius: 4px;
-  background: #FAFAFA;
-  border: 1px solid #EAEAEA;
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   opacity: 0.7;
   transition: all 0.3s;
   min-width: 140px;
@@ -744,14 +813,15 @@ onUnmounted(() => {
 
 .platform-status.active {
   opacity: 1;
-  border-color: #333;
-  background: #FFF;
+  border-color: rgba(139, 92, 246, 0.55);
+  background: var(--sb-glass-strong);
+  box-shadow: var(--sb-shadow-glow);
 }
 
 .platform-status.completed {
   opacity: 1;
-  border-color: #1A936F;
-  background: #F2FAF6;
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.08);
 }
 
 /* Actions Tooltip */
@@ -762,10 +832,13 @@ onUnmounted(() => {
   transform: translateX(-50%);
   margin-top: 8px;
   padding: 10px 14px;
-  background: #000;
-  color: #FFF;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: rgba(18, 18, 34, 0.95);
+  color: var(--sb-text);
+  border: 1px solid var(--sb-glass-border);
+  border-radius: var(--sb-radius-sm);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
@@ -782,7 +855,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-bottom: 6px solid #000;
+  border-bottom: 6px solid rgba(18, 18, 34, 0.95);
 }
 
 .platform-status:hover .actions-tooltip {
@@ -793,7 +866,7 @@ onUnmounted(() => {
 .tooltip-title {
   font-size: 10px;
   font-weight: 600;
-  color: #999;
+  color: var(--sb-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 8px;
@@ -809,9 +882,10 @@ onUnmounted(() => {
   font-size: 10px;
   font-weight: 600;
   padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-  color: #FFF;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  color: #c4b5fd;
   letter-spacing: 0.03em;
 }
 
@@ -825,13 +899,13 @@ onUnmounted(() => {
 .platform-name {
   font-size: 11px;
   font-weight: 700;
-  color: #000;
+  color: var(--sb-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.platform-status.twitter .platform-icon { color: #000; }
-.platform-status.reddit .platform-icon { color: #000; }
+.platform-status.twitter .platform-icon { color: #c4b5fd; }
+.platform-status.reddit .platform-icon { color: var(--sb-info); }
 
 .platform-stats {
   display: flex;
@@ -846,7 +920,7 @@ onUnmounted(() => {
 
 .stat-label {
   font-size: 8px;
-  color: #999;
+  color: var(--sb-text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -855,18 +929,18 @@ onUnmounted(() => {
 .stat-value {
   font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: var(--sb-text);
 }
 
 .stat-total, .stat-unit {
   font-size: 9px;
-  color: #999;
+  color: var(--sb-text-muted);
   font-weight: 400;
 }
 
 .status-badge {
   margin-left: auto;
-  color: #1A936F;
+  color: var(--sb-success);
   display: flex;
   align-items: center;
 }
@@ -879,8 +953,9 @@ onUnmounted(() => {
   padding: 10px 20px;
   font-size: 13px;
   font-weight: 600;
+  font-family: var(--sb-font-display);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--sb-radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   text-transform: uppercase;
@@ -888,16 +963,17 @@ onUnmounted(() => {
 }
 
 .action-btn.primary {
-  background: #000;
-  color: #FFF;
+  background: var(--sb-gradient);
+  color: var(--sb-text-on-accent);
 }
 
 .action-btn.primary:hover:not(:disabled) {
-  background: #333;
+  transform: translateY(-1px);
+  box-shadow: var(--sb-shadow-glow);
 }
 
 .action-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -906,17 +982,18 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   position: relative;
-  background: #FFF;
+  background: transparent;
 }
 
 /* Timeline Header */
 .timeline-header {
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
+  background: rgba(11, 11, 23, 0.7);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   padding: 12px 24px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--sb-glass-border);
   z-index: 5;
   display: flex;
   justify-content: center;
@@ -927,15 +1004,16 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   font-size: 11px;
-  color: #666;
-  background: #F5F5F5;
+  color: var(--sb-text-secondary);
+  background: var(--sb-glass);
+  border: 1px solid var(--sb-glass-border);
   padding: 4px 12px;
   border-radius: 20px;
 }
 
 .total-count {
   font-weight: 600;
-  color: #333;
+  color: var(--sb-text);
 }
 
 .platform-breakdown {
@@ -950,9 +1028,9 @@ onUnmounted(() => {
   gap: 4px;
 }
 
-.breakdown-divider { color: #DDD; }
-.breakdown-item.twitter { color: #000; }
-.breakdown-item.reddit { color: #000; }
+.breakdown-divider { color: var(--sb-text-muted); }
+.breakdown-item.twitter { color: #c4b5fd; }
+.breakdown-item.reddit { color: var(--sb-info); }
 
 /* --- Timeline Feed --- */
 .timeline-feed {
@@ -969,7 +1047,7 @@ onUnmounted(() => {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #EAEAEA; /* Cleaner line */
+  background: linear-gradient(to bottom, rgba(139, 92, 246, 0.35), rgba(99, 102, 241, 0.28), rgba(59, 130, 246, 0.22));
   transform: translateX(-50%);
 }
 
@@ -987,8 +1065,8 @@ onUnmounted(() => {
   top: 24px;
   width: 10px;
   height: 10px;
-  background: #FFF;
-  border: 1px solid #CCC;
+  background: var(--sb-bg-elevated);
+  border: 1px solid var(--sb-glass-border-strong);
   border-radius: 50%;
   transform: translateX(-50%);
   z-index: 2;
@@ -1000,30 +1078,46 @@ onUnmounted(() => {
 .marker-dot {
   width: 4px;
   height: 4px;
-  background: #CCC;
+  background: var(--sb-text-muted);
   border-radius: 50%;
 }
 
-.timeline-item.twitter .marker-dot { background: #000; }
-.timeline-item.reddit .marker-dot { background: #000; }
-.timeline-item.twitter .timeline-marker { border-color: #000; }
-.timeline-item.reddit .timeline-marker { border-color: #000; }
+.timeline-item.twitter .marker-dot { background: var(--sb-violet); }
+.timeline-item.reddit .marker-dot { background: var(--sb-blue); }
+.timeline-item.twitter .timeline-marker { border-color: rgba(139, 92, 246, 0.55); }
+.timeline-item.reddit .timeline-marker { border-color: rgba(59, 130, 246, 0.55); }
 
 /* Card Layout */
 .timeline-card {
   width: calc(100% - 48px);
-  background: #FFF;
-  border-radius: 2px;
+  background: var(--sb-glass);
+  border-radius: var(--sb-radius);
   padding: 16px 20px;
-  border: 1px solid #EAEAEA;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+  border: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
+  box-shadow: var(--sb-shadow);
   position: relative;
   transition: all 0.2s;
 }
 
 .timeline-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border-color: #DDD;
+  transform: translateY(-2px);
+  box-shadow: var(--sb-shadow), var(--sb-shadow-glow);
+  border-color: var(--sb-glass-border-strong);
+}
+
+/* Procedural notice from the tribunal */
+.timeline-card.procedural {
+  text-align: center;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.10), rgba(99, 102, 241, 0.05));
+  border-left: 3px solid var(--sb-violet);
+}
+
+.timeline-card.procedural .content-text {
+  font-style: italic;
+  color: var(--sb-text-secondary);
+  letter-spacing: 0.02em;
 }
 
 /* Left side (Twitter) */
@@ -1046,6 +1140,25 @@ onUnmounted(() => {
   margin-left: 32px; /* Gap from axis */
 }
 
+/* Single-platform (仲裁/纯Reddit)：轴线靠左，卡片占满整行 */
+.timeline-feed.single-platform .timeline-axis {
+  left: 24px;
+}
+.timeline-feed.single-platform .timeline-item {
+  justify-content: flex-start;
+  padding-left: 0;
+  padding-right: 0;
+}
+.timeline-feed.single-platform .timeline-item .timeline-marker {
+  left: 24px;
+}
+.timeline-feed.single-platform .timeline-item .timeline-card {
+  flex: 1;
+  width: auto;
+  margin-left: 48px;
+  margin-right: 24px;
+}
+
 /* Card Content Styles */
 .card-header {
   display: flex;
@@ -1053,7 +1166,7 @@ onUnmounted(() => {
   align-items: flex-start;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #F5F5F5;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .agent-info {
@@ -1065,8 +1178,8 @@ onUnmounted(() => {
 .avatar-placeholder {
   width: 24px;
   height: 24px;
-  background: #000;
-  color: #FFF;
+  background: var(--sb-gradient);
+  color: var(--sb-text-on-accent);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1079,7 +1192,42 @@ onUnmounted(() => {
 .agent-name {
   font-size: 13px;
   font-weight: 600;
-  color: #000;
+  color: var(--sb-text);
+}
+
+/* Speaker role badges (tribunal deliberation) */
+.role-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.role-badge.role-arbitrator {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.role-badge.role-claimant {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.role-badge.role-respondent {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.role-badge.role-counsel {
+  background: var(--sb-glass);
+  color: var(--sb-text-secondary);
+  border-color: var(--sb-glass-border);
 }
 
 .header-meta {
@@ -1089,7 +1237,7 @@ onUnmounted(() => {
 }
 
 .platform-indicator {
-  color: #999;
+  color: var(--sb-text-muted);
   display: flex;
   align-items: center;
 }
@@ -1097,41 +1245,41 @@ onUnmounted(() => {
 .action-badge {
   font-size: 9px;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 6px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid transparent;
 }
 
-/* Monochromatic Badges */
-.badge-post { background: #F0F0F0; color: #333; border-color: #E0E0E0; }
-.badge-comment { background: #F0F0F0; color: #666; border-color: #E0E0E0; }
-.badge-action { background: #FFF; color: #666; border: 1px solid #E0E0E0; }
-.badge-meta { background: #FAFAFA; color: #999; border: 1px dashed #DDD; }
+/* Glass Badges */
+.badge-post { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.35); }
+.badge-comment { background: rgba(96, 165, 250, 0.15); color: var(--sb-info); border-color: rgba(96, 165, 250, 0.35); }
+.badge-action { background: var(--sb-glass); color: var(--sb-text-secondary); border: 1px solid var(--sb-glass-border); }
+.badge-meta { background: rgba(255, 255, 255, 0.04); color: var(--sb-text-muted); border: 1px dashed var(--sb-glass-border); }
 .badge-idle { opacity: 0.5; }
 
 .content-text {
   font-size: 13px;
   line-height: 1.6;
-  color: #333;
+  color: var(--sb-text-secondary);
   margin-bottom: 10px;
 }
 
 .content-text.main-text {
   font-size: 14px;
-  color: #000;
+  color: var(--sb-text);
 }
 
 /* Info Blocks (Quote, Repost, etc) */
 .quoted-block, .repost-content {
-  background: #F9F9F9;
-  border: 1px solid #EEE;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sb-glass-border);
   padding: 10px 12px;
-  border-radius: 2px;
+  border-radius: var(--sb-radius-sm);
   margin-top: 8px;
   font-size: 12px;
-  color: #555;
+  color: var(--sb-text-secondary);
 }
 
 .quote-header, .repost-info, .like-info, .search-info, .follow-info, .vote-info, .idle-info, .comment-context {
@@ -1140,21 +1288,22 @@ onUnmounted(() => {
   gap: 6px;
   margin-bottom: 6px;
   font-size: 11px;
-  color: #666;
+  color: var(--sb-text-muted);
 }
 
 .icon-small {
-  color: #999;
+  color: var(--sb-text-muted);
 }
 .icon-small.filled {
-  color: #999; /* Keep icons neutral unless highlighted */
+  color: var(--sb-text-muted); /* Keep icons neutral unless highlighted */
 }
 
 .search-query {
-  font-family: 'JetBrains Mono', monospace;
-  background: #F0F0F0;
+  font-family: var(--sb-font-mono);
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
   padding: 0 4px;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .card-footer {
@@ -1162,8 +1311,8 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   font-size: 10px;
-  color: #BBB;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--sb-text-muted);
+  font-family: var(--sb-font-mono);
 }
 
 /* Waiting State */
@@ -1176,7 +1325,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  color: #CCC;
+  color: var(--sb-text-muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1186,13 +1335,13 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid #EAEAEA;
+  border: 1px solid rgba(139, 92, 246, 0.35);
   animation: ripple 2s infinite;
 }
 
 @keyframes ripple {
-  0% { transform: scale(0.8); opacity: 1; border-color: #CCC; }
-  100% { transform: scale(2.5); opacity: 0; border-color: #EAEAEA; }
+  0% { transform: scale(0.8); opacity: 1; border-color: rgba(139, 92, 246, 0.6); }
+  100% { transform: scale(2.5); opacity: 0; border-color: rgba(139, 92, 246, 0.1); }
 }
 
 /* Animation */
@@ -1212,22 +1361,24 @@ onUnmounted(() => {
 
 /* Logs */
 .system-logs {
-  background: #000;
-  color: #DDD;
+  background: rgba(10, 10, 25, 0.6);
+  color: var(--sb-text-secondary);
   padding: 16px;
-  font-family: 'JetBrains Mono', monospace;
-  border-top: 1px solid #222;
+  font-family: var(--sb-font-mono);
+  border-top: 1px solid var(--sb-glass-border);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   flex-shrink: 0;
 }
 
 .log-header {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 8px;
   margin-bottom: 8px;
   font-size: 10px;
-  color: #666;
+  color: var(--sb-text-muted);
 }
 
 .log-content {
@@ -1240,7 +1391,7 @@ onUnmounted(() => {
 }
 
 .log-content::-webkit-scrollbar { width: 4px; }
-.log-content::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.log-content::-webkit-scrollbar-thumb { background: rgba(139, 116, 246, 0.35); border-radius: 2px; }
 
 .log-line {
   font-size: 11px;
@@ -1249,9 +1400,9 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-.log-time { color: #555; min-width: 75px; }
-.log-msg { color: #BBB; word-break: break-all; }
-.mono { font-family: 'JetBrains Mono', monospace; }
+.log-time { color: var(--sb-text-muted); min-width: 75px; }
+.log-msg { color: var(--sb-text-secondary); word-break: break-all; }
+.mono { font-family: var(--sb-font-mono); }
 
 /* Loading spinner for button */
 .loading-spinner-small {
@@ -1259,7 +1410,7 @@ onUnmounted(() => {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #FFF;
+  border-top-color: var(--sb-text-on-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-right: 6px;

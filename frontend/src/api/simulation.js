@@ -185,3 +185,19 @@ export const getSimulationHistory = (limit = 20) => {
   return service.get('/api/simulation/history', { params: { limit } })
 }
 
+
+/**
+ * 仲裁模式：获取已提取的裁决预测（verdict.json）
+ * @param {string} simulationId
+ */
+export const getVerdict = (simulationId) => {
+  return service.get(`/api/simulation/${simulationId}/verdict`)
+}
+
+/**
+ * 仲裁模式：采访仲裁庭并提取结构化裁决（耗时操作）
+ * @param {string} simulationId
+ */
+export const extractVerdict = (simulationId) => {
+  return service.post(`/api/simulation/${simulationId}/verdict`, {}, { timeout: 600000 })
+}

@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH</div>
+        <div class="brand" @click="router.push('/')">SEBASTIAN</div>
       </div>
       
       <div class="header-center">
@@ -223,20 +223,22 @@ onMounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #FFF;
+  background: transparent;
   overflow: hidden;
-  font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
+  font-family: var(--sb-font-display);
 }
 
 /* Header */
 .app-header {
   height: 60px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--sb-glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #FFF;
+  background: rgba(11, 11, 23, 0.55);
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
   z-index: 100;
   position: relative;
 }
@@ -248,19 +250,27 @@ onMounted(() => {
 }
 
 .brand {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-display);
   font-weight: 800;
   font-size: 18px;
   letter-spacing: 1px;
   cursor: pointer;
+  background: var(--sb-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .view-switcher {
   display: flex;
-  background: #F5F5F5;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--sb-glass-border);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--sb-radius-sm);
   gap: 4px;
+  backdrop-filter: blur(var(--sb-glass-blur));
+  -webkit-backdrop-filter: blur(var(--sb-glass-blur));
 }
 
 .switch-btn {
@@ -269,16 +279,16 @@ onMounted(() => {
   padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
-  border-radius: 4px;
+  color: var(--sb-text-secondary);
+  border-radius: calc(var(--sb-radius-sm) - 4px);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .switch-btn.active {
-  background: #FFF;
-  color: #000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--sb-text);
+  box-shadow: 0 2px 8px rgba(5, 5, 20, 0.35);
 }
 
 .header-right {
@@ -295,20 +305,20 @@ onMounted(() => {
 }
 
 .step-num {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--sb-font-mono);
   font-weight: 700;
-  color: #999;
+  color: var(--sb-text-muted);
 }
 
 .step-name {
   font-weight: 700;
-  color: #000;
+  color: var(--sb-text);
 }
 
 .step-divider {
   width: 1px;
   height: 14px;
-  background-color: #E0E0E0;
+  background-color: var(--sb-glass-border);
 }
 
 .status-indicator {
@@ -316,7 +326,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--sb-text-secondary);
   font-weight: 500;
 }
 
@@ -324,13 +334,13 @@ onMounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #CCC;
+  background: var(--sb-text-muted);
 }
 
-.status-indicator.ready .dot { background: #4CAF50; }
-.status-indicator.processing .dot { background: #FF9800; animation: pulse 1s infinite; }
-.status-indicator.completed .dot { background: #4CAF50; }
-.status-indicator.error .dot { background: #F44336; }
+.status-indicator.ready .dot { background: var(--sb-success); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+.status-indicator.processing .dot { background: var(--sb-warning); box-shadow: 0 0 8px rgba(251, 191, 36, 0.5); animation: pulse 1s infinite; }
+.status-indicator.completed .dot { background: var(--sb-success); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+.status-indicator.error .dot { background: var(--sb-danger); box-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
 
 @keyframes pulse { 50% { opacity: 0.5; } }
 
@@ -350,6 +360,6 @@ onMounted(() => {
 }
 
 .panel-wrapper.left {
-  border-right: 1px solid #EAEAEA;
+  border-right: 1px solid var(--sb-glass-border);
 }
 </style>

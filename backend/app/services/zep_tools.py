@@ -483,8 +483,12 @@ class ZepToolsService:
         Returns:
             SearchResult: 搜索结果
         """
+        # Zep API 限制：查询不能超过400字符
+        if query and len(query) > 400:
+            query = query[:397] + "..."
+
         logger.info(t("console.graphSearch", graphId=graph_id, query=query[:50]))
-        
+
         # 尝试使用Zep Cloud Search API
         try:
             search_results = self._call_with_retry(

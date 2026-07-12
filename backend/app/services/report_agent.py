@@ -550,107 +550,110 @@ TOOL_DESC_INTERVIEW_AGENTS = """\
 # ── 大纲规划 prompt ──
 
 PLAN_SYSTEM_PROMPT = """\
-你是一个「未来预测报告」的撰写专家，拥有对模拟世界的「上帝视角」——你可以洞察模拟中每一位Agent的行为、言论和互动。
+You are an expert author of ARBITRATION AWARD PREDICTION reports. You have a god's-eye view over a simulated arbitration: a three-member tribunal (with distinct judicial philosophies) and counsel for both sides deliberated the matter through a full hearing — openings, submissions, tribunal questions, closings, and deliberation — and the arbitrators cast structured votes.
 
-【核心理念】
-我们构建了一个模拟世界，并向其中注入了特定的「模拟需求」作为变量。模拟世界的演化结果，就是对未来可能发生情况的预测。你正在观察的不是"实验数据"，而是"未来的预演"。
+[Core idea]
+The simulated proceedings are a rehearsal of the real arbitration. The arguments counsel advanced, the questions the tribunal asked, and the votes the arbitrators cast are predictions of how the real matter is likely to unfold.
 
-【你的任务】
-撰写一份「未来预测报告」，回答：
-1. 在我们设定的条件下，未来发生了什么？
-2. 各类Agent（人群）是如何反应和行动？
-3. 这个模拟揭示了哪些值得关注的未来趋势和风险？
+[Your task]
+Write an "Arbitration Award Prediction" report answering:
+1. PREDICTED OUTCOME: who prevails, on which claims, with what probability/confidence (use the structured tribunal vote when provided in the context)
+2. ISSUE-BY-ISSUE ANALYSIS: how each claim/defense fared and why — which clauses, evidence, and authorities proved decisive
+3. ARGUMENT STRENGTH: each side's strongest and weakest arguments as revealed by the proceedings
+4. DAMAGES: the predicted quantum range and what drives it
+5. DISSENT & SENSITIVITY: where arbitrators disagreed, and which factors could flip the outcome
 
-【报告定位】
-- ✅ 这是一份基于模拟的未来预测报告，揭示"如果这样，未来会怎样"
-- ✅ 聚焦于预测结果：事件走向、群体反应、涌现现象、潜在风险
-- ✅ 模拟世界中的Agent言行就是对未来人群行为的预测
-- ❌ 不是对现实世界现状的分析
-- ❌ 不是泛泛而谈的舆情综述
+[Report positioning]
+- ✅ A simulation-based prediction of the award — "given this record, this is the likely outcome and why"
+- ✅ Every finding grounded in the simulated proceedings (agent arguments, tribunal questions, votes)
+- ❌ Not generic legal commentary; not advice on what the law "should" be
+- The report MUST include, in its final section or a natural place, a one-line disclaimer that this is a simulation-based prediction and not legal advice.
 
-【章节数量限制】
-- 最少2个章节，最多5个章节
-- 不需要子章节，每个章节直接撰写完整内容
-- 内容要精炼，聚焦于核心预测发现
-- 章节结构由你根据预测结果自主设计
+[Section count limits]
+- Minimum 2 sections, maximum 5 sections
+- No subsections — each section is written as complete standalone content
+- Keep it focused on the core predictive findings
+- You design the section structure based on the results
 
-请输出JSON格式的报告大纲，格式如下：
+Output the report outline as JSON in this format:
 {
-    "title": "报告标题",
-    "summary": "报告摘要（一句话概括核心预测发现）",
+    "title": "Report title",
+    "summary": "One-sentence summary of the core predicted outcome",
     "sections": [
         {
-            "title": "章节标题",
-            "description": "章节内容描述"
+            "title": "Section title",
+            "description": "What this section covers"
         }
     ]
 }
 
-注意：sections数组最少2个，最多5个元素！"""
+Note: the sections array must have at least 2 and at most 5 elements!"""
 
 PLAN_USER_PROMPT_TEMPLATE = """\
-【预测场景设定】
-我们向模拟世界注入的变量（模拟需求）：{simulation_requirement}
+[The matter and prediction context]
+The matter description, case structure, and (if available) the tribunal's structured vote: {simulation_requirement}
 
-【模拟世界规模】
-- 参与模拟的实体数量: {total_nodes}
-- 实体间产生的关系数量: {total_edges}
-- 实体类型分布: {entity_types}
-- 活跃Agent数量: {total_entities}
+[Scale of the simulated proceedings]
+- Entities in the case graph: {total_nodes}
+- Relationships between entities: {total_edges}
+- Entity type distribution: {entity_types}
+- Active agents (tribunal + counsel): {total_entities}
 
-【模拟预测到的部分未来事实样本】
+[Sample facts from the simulated proceedings]
 {related_facts_json}
 
-请以「上帝视角」审视这个未来预演：
-1. 在我们设定的条件下，未来呈现出了什么样的状态？
-2. 各类人群（Agent）是如何反应和行动的？
-3. 这个模拟揭示了哪些值得关注的未来趋势？
+Review the simulated arbitration with your god's-eye view:
+1. What outcome did the tribunal reach, and how confident/split was it?
+2. How did each side's arguments perform under tribunal questioning?
+3. What are the decisive factors and the sensitivity points that could flip the result?
 
-根据预测结果，设计最合适的报告章节结构。
+Design the most fitting report section structure for these findings.
 
-【再次提醒】报告章节数量：最少2个，最多5个，内容要精炼聚焦于核心预测发现。"""
+[Reminder] Section count: minimum 2, maximum 5, focused on the core predictive findings."""
 
 # ── 章节生成 prompt ──
 
 SECTION_SYSTEM_PROMPT_TEMPLATE = """\
-你是一个「未来预测报告」的撰写专家，正在撰写报告的一个章节。
+You are an expert author of an ARBITRATION AWARD PREDICTION report, currently writing one section of it.
 
-报告标题: {report_title}
-报告摘要: {report_summary}
-预测场景（模拟需求）: {simulation_requirement}
+Report title: {report_title}
+Report summary: {report_summary}
+Matter and prediction context: {simulation_requirement}
 
-当前要撰写的章节: {section_title}
-
-═══════════════════════════════════════════════════════════════
-【核心理念】
-═══════════════════════════════════════════════════════════════
-
-模拟世界是对未来的预演。我们向模拟世界注入了特定条件（模拟需求），
-模拟中Agent的行为和互动，就是对未来人群行为的预测。
-
-你的任务是：
-- 揭示在设定条件下，未来发生了什么
-- 预测各类人群（Agent）是如何反应和行动的
-- 发现值得关注的未来趋势、风险和机会
-
-❌ 不要写成对现实世界现状的分析
-✅ 要聚焦于"未来会怎样"——模拟结果就是预测的未来
+Section you are writing now: {section_title}
 
 ═══════════════════════════════════════════════════════════════
-【最重要的规则 - 必须遵守】
+[Core idea]
 ═══════════════════════════════════════════════════════════════
 
-1. 【必须调用工具观察模拟世界】
-   - 你正在以「上帝视角」观察未来的预演
-   - 所有内容必须来自模拟世界中发生的事件和Agent言行
-   - 禁止使用你自己的知识来编写报告内容
-   - 每个章节至少调用3次工具（最多5次）来观察模拟的世界，它代表了未来
+The simulated proceedings are a rehearsal of the real arbitration: a three-member
+tribunal and both parties' counsel argued and deliberated the matter, and the
+arbitrators cast votes. Their arguments, questions and findings predict how the
+real matter is likely to be decided.
 
-2. 【必须引用Agent的原始言行】
-   - Agent的发言和行为是对未来人群行为的预测
-   - 在报告中使用引用格式展示这些预测，例如：
-     > "某类人群会表示：原文内容..."
-   - 这些引用是模拟预测的核心证据
+Your task:
+- Reveal how the tribunal decided the issues in this section's scope, and why
+- Show which arguments, clauses, evidence and authorities proved decisive
+- Surface disagreement between arbitrators and factors that could flip the outcome
+
+❌ Do not write generic legal commentary from your own knowledge
+✅ Focus on "what the tribunal did and what that predicts" — the record is the evidence
+
+═══════════════════════════════════════════════════════════════
+[Most important rules — must follow]
+═══════════════════════════════════════════════════════════════
+
+1. [Must call tools to observe the proceedings]
+   - You observe the simulated proceedings with a god's-eye view
+   - All content must come from the case graph and the agents' actual statements
+   - Do not write report content from your own knowledge
+   - Call tools at least 3 times per section (at most 5) to gather the record
+
+2. [Must quote the agents' original statements]
+   - Counsel's arguments and arbitrators' reasoning are the core evidence
+   - Present them as quotes, e.g.:
+     > "The Presiding Arbitrator observed: original text..."
+   - These quotes are the evidentiary backbone of the prediction
 
 3. 【语言一致性 - 引用内容必须翻译为报告语言】
    - 工具返回的内容可能包含与报告语言不同的表述
@@ -827,10 +830,10 @@ REACT_FORCE_FINAL_MSG = "已达到工具调用限制，请直接输出 Final Ans
 # ── Chat prompt ──
 
 CHAT_SYSTEM_PROMPT_TEMPLATE = """\
-你是一个简洁高效的模拟预测助手。
+You are a concise assistant for an arbitration award prediction. You answer questions about the simulated proceedings, the tribunal's reasoning, and the predicted outcome. Remind users when relevant that this is a simulation-based prediction, not legal advice.
 
 【背景】
-预测条件: {simulation_requirement}
+Matter and prediction context: {simulation_requirement}
 
 【已生成的分析报告】
 {report_content}
@@ -1209,12 +1212,12 @@ class ReportAgent:
             logger.error(t('report.outlinePlanFailed', error=str(e)))
             # 返回默认大纲（3个章节，作为fallback）
             return ReportOutline(
-                title="未来预测报告",
-                summary="基于模拟预测的未来趋势与风险分析",
+                title="Arbitration Award Prediction Report",
+                summary="Simulation-based prediction of the tribunal's award",
                 sections=[
-                    ReportSection(title="预测场景与核心发现"),
-                    ReportSection(title="人群行为预测分析"),
-                    ReportSection(title="趋势展望与风险提示")
+                    ReportSection(title="Predicted Outcome and Tribunal Vote"),
+                    ReportSection(title="Issue-by-Issue Analysis and Argument Strength"),
+                    ReportSection(title="Damages, Dissent and Sensitivity Factors")
                 ]
             )
     

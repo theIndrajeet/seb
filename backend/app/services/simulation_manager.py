@@ -16,7 +16,9 @@ from ..config import Config
 from ..utils.logger import get_logger
 from .zep_entity_reader import ZepEntityReader, FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
+from .panel_generator import PanelGenerator
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
+from ..models.project import ProjectManager
 from ..utils.locale import t
 
 logger = get_logger('mirofish.simulation')
@@ -295,11 +297,17 @@ class SimulationManager:
                     total=filtered.filtered_count
                 )
             
-            if filtered.filtered_count == 0:
+            # 仲裁模式下面板是合成的，不依赖图谱实体，稀疏图谱不应导致失败
+            _project = ProjectManager.get_project(state.project_id) if state.project_id else None
+            _arbitration = bool(_project and _project.case_meta)
+
+            if filtered.filtered_count == 0 and not _arbitration:
                 state.status = SimulationStatus.FAILED
                 state.error = "没有找到符合条件的实体，请检查图谱是否正确构建"
                 self._save_simulation_state(state)
                 return state
+            if filtered.filtered_count == 0:
+                logger.warning("仲裁模式：图谱实体为空，面板将仅基于案件受理信息合成")
             
             # ========== 阶段2: 生成Agent Profile ==========
             total_entities = len(filtered.entities)
@@ -312,39 +320,54 @@ class SimulationManager:
                     total=total_entities
                 )
             
-            # 传入graph_id以启用Zep检索功能，获取更丰富的上下文
-            generator = OasisProfileGenerator(graph_id=state.graph_id)
-            
             def profile_progress(current, total, msg):
                 if progress_callback:
                     progress_callback(
-                        "generating_profiles", 
-                        int(current / total * 100), 
+                        "generating_profiles",
+                        int(current / total * 100),
                         msg,
                         current=current,
                         total=total,
                         item_name=msg
                     )
-            
-            # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
-            realtime_output_path = None
-            realtime_platform = "reddit"
-            if state.enable_reddit:
-                realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
+
+            # 仲裁模式：项目带有 case_meta 时，生成仲裁庭面板而非社媒用户画像
+            project = ProjectManager.get_project(state.project_id) if state.project_id else None
+            case_meta = project.case_meta if project else None
+
+            if case_meta:
+                logger.info("仲裁模式：生成仲裁庭面板（3名仲裁员 + 双方律师）")
+                # 仲裁庭审仅使用 Reddit 平台（帖子=陈述，评论=质询/答辩）
+                state.enable_twitter = False
+                state.enable_reddit = True
+                generator = PanelGenerator(graph_id=state.graph_id)
+                profiles = generator.generate_panel(
+                    case_meta=case_meta,
+                    progress_callback=profile_progress
+                )
+            else:
+                # 传入graph_id以启用Zep检索功能，获取更丰富的上下文
+                generator = OasisProfileGenerator(graph_id=state.graph_id)
+
+                # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
+                realtime_output_path = None
                 realtime_platform = "reddit"
-            elif state.enable_twitter:
-                realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                realtime_platform = "twitter"
-            
-            profiles = generator.generate_profiles_from_entities(
-                entities=filtered.entities,
-                use_llm=use_llm_for_profiles,
-                progress_callback=profile_progress,
-                graph_id=state.graph_id,  # 传入graph_id用于Zep检索
-                parallel_count=parallel_profile_count,  # 并行生成数量
-                realtime_output_path=realtime_output_path,  # 实时保存路径
-                output_platform=realtime_platform  # 输出格式
-            )
+                if state.enable_reddit:
+                    realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
+                    realtime_platform = "reddit"
+                elif state.enable_twitter:
+                    realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
+                    realtime_platform = "twitter"
+
+                profiles = generator.generate_profiles_from_entities(
+                    entities=filtered.entities,
+                    use_llm=use_llm_for_profiles,
+                    progress_callback=profile_progress,
+                    graph_id=state.graph_id,  # 传入graph_id用于Zep检索
+                    parallel_count=parallel_profile_count,  # 并行生成数量
+                    realtime_output_path=realtime_output_path,  # 实时保存路径
+                    output_platform=realtime_platform  # 输出格式
+                )
             
             state.profiles_count = len(profiles)
             
@@ -400,16 +423,26 @@ class SimulationManager:
                     total=3
                 )
             
-            sim_params = config_generator.generate_config(
-                simulation_id=simulation_id,
-                project_id=state.project_id,
-                graph_id=state.graph_id,
-                simulation_requirement=simulation_requirement,
-                document_text=document_text,
-                entities=filtered.entities,
-                enable_twitter=state.enable_twitter,
-                enable_reddit=state.enable_reddit
-            )
+            if case_meta:
+                sim_params = config_generator.generate_arbitration_config(
+                    simulation_id=simulation_id,
+                    project_id=state.project_id,
+                    graph_id=state.graph_id,
+                    simulation_requirement=simulation_requirement,
+                    case_meta=case_meta,
+                    profiles=profiles
+                )
+            else:
+                sim_params = config_generator.generate_config(
+                    simulation_id=simulation_id,
+                    project_id=state.project_id,
+                    graph_id=state.graph_id,
+                    simulation_requirement=simulation_requirement,
+                    document_text=document_text,
+                    entities=filtered.entities,
+                    enable_twitter=state.enable_twitter,
+                    enable_reddit=state.enable_reddit
+                )
             
             if progress_callback:
                 progress_callback(
